@@ -1,0 +1,211 @@
+====================================================================
+                 TREASURY RESERVE ARCHITECTURE
+====================================================================
+
+GOAL:
+- Maintain 1:1 backing (or overcollateralization)
+- Enforce Proof-of-Reserve (PoR) gates for minting
+- Separate custody, accounting, and execution permissions
+
+====================================================================
+RESERVE TIERS
+====================================================================
+
+  Tier   | Name  | Purpose                    | Liquidity | % Allocation
+  -------+-------+----------------------------+-----------+-------------
+  TIER 0 | HOT   | Instant redemptions        | Immediate | 5-10%
+  TIER 1 | WARM  | Exchange/MM/rebalancing    | Hours     | 15-25%
+  TIER 2 | COLD  | Primary custody (majority) | Days      | 50-60%
+  TIER 3 | RWA   | T-Bills/MMFs/bank deposits | Days-Wks  | 10-20%
+
+====================================================================
+ARCHITECTURE MAP
+====================================================================
+
+                USERS / REDEMPTIONS
+                        |
+                        v
+              +----------------------+
+              |  REDEMPTION PORTAL   |
+              |  (burn -> payout)    |
+              |                      |
+              | Validates:           |
+              | - User balance       |
+              | - Amount > minimum   |
+              | - Not paused         |
+              | - Rate limit check   |
+              +----------+-----------+
+                         |
+                         v
+              +----------------------+
+              |  LIQUIDITY MANAGER   |
+              | selects tier source  |
+              |                      |
+              | Priority order:      |
+              | 1. Tier 0 (HOT)      |
+              | 2. Tier 1 (WARM)     |
+              | 3. Tier 2 (COLD)     |
+              | 4. Tier 3 (RWA)      |
+              +----------+-----------+
+                         |
+        +----------------+-------------------+
+        |                |                   |
+        v                v                   v
+ +-------------+   +-------------+     +-------------+
+ |  TIER 0 HOT |   | TIER 1 WARM |     |  TIER 2 COLD|
+ | (on-chain)  |   | (CEX/MM)    |     | (custody)   |
+ |             |   |             |     |             |
+ | - USDC pool |   | - Exchange  |     | - Fireblocks|
+ | - DAI pool  |   | - MM firms  |     | - Coinbase  |
+ | - Instant   |   | - OTC desks |     | - BitGo     |
+ +------+------+   +------+------+     +------+------+
+        |                |                   |
+        |          +-----+-----+             |
+        |          |           |             |
+        |          v           v             |
+        |   +-------------+  +-------------+ |
+        |   | TIER 3 RWA  |  | RWA CUSTODY | |
+        |   | (T-Bills)   |  | (regulated) | |
+        |   +------+------+  +------+------+ |
+        |          |                |        |
+        +----------+-------+--------+--------+
+                           |
+                           v
+              +------------------------+
+              |    RESERVE ORACLE      |
+              |    PoR / Balances      |
+              |                        |
+              | Aggregates:            |
+              | - On-chain balances    |
+              | - CEX API attestations |
+              | - Custodian reports    |
+              | - RWA valuations       |
+              +------------+-----------+
+                           |
+                           v
+              +------------------------+
+              | OFF-CHAIN ACCOUNTING   |
+              | ledger + attestations  |
+              |                        |
+              | Maintains:             |
+              | - Real-time ledger     |
+              | - Audit trail          |
+              | - Reconciliation       |
+              | - Third-party audits   |
+              +------------+-----------+
+                           |
+                +----------+----------+
+                           |
+                           v
+              +------------------------+
+              |   MINT GATE / POLICY   |
+              |   PoR OK? caps/rates   |
+              |                        |
+              | Checks before mint:    |
+              | 1. total_reserves >=   |
+              |    post_mint_supply    |
+              | 2. Oracle healthy      |
+              | 3. Rate limit OK       |
+              | 4. Global cap OK       |
+              | 5. Not paused          |
+              +------------+-----------+
+                           |
+                           v
+              STABLECOIN CONTRACT (MINT/BURN)
+
+====================================================================
+CONTROL & SEPARATION OF DUTIES
+====================================================================
+
+  Role               | Responsibilities              | Access Level
+  -------------------+-------------------------------+---------------
+  CUSTODIAN          | Holds Tier2/Tier3 assets      | Keys to custody
+  TREASURY OPS       | Manages Tier0/Tier1 rebalance | Limited hot keys
+  ORACLE ATTESTOR    | Signs PoR updates             | Independent party
+  GOVERNANCE         | Changes parameters            | Timelock only
+  EMERGENCY MULTISIG | Pause/freeze/rotate keys      | Guardian keys
+
+====================================================================
+PERMISSION MATRIX
+====================================================================
+
+  Action                    | Custodian | Ops | Attestor | Gov | Emergency
+  --------------------------+-----------+-----+----------+-----+----------
+  Move Tier0 funds          |           |  X  |          |     |
+  Move Tier1 funds          |     X     |  X  |          |     |
+  Move Tier2 funds          |     X     |     |          |     |
+  Move Tier3 funds          |     X     |     |          |  X  |
+  Sign PoR attestation      |           |     |    X     |     |
+  Change mint caps          |           |     |          |  X  |
+  Pause mint/burn           |           |     |          |     |     X
+  Rotate custody keys       |     X     |     |          |  X  |     X
+  Add new tier              |           |     |          |  X  |
+
+====================================================================
+RESERVE REBALANCING RULES
+====================================================================
+
+AUTOMATIC REBALANCING:
+─────────────────────────────────────────────────────────────────────
+  Condition                    | Action
+  -----------------------------+-------------------------------------
+  Tier0 < 5% of reserves       | Move from Tier1 to Tier0
+  Tier0 > 15% of reserves      | Move excess to Tier1
+  Tier1 < 15% of reserves      | Move from Tier2 to Tier1
+  Redemption spike detected    | Pre-emptive Tier1 → Tier0 move
+  Large mint incoming          | Verify Tier3 RWA available
+
+MANUAL REBALANCING (Treasury Ops):
+─────────────────────────────────────────────────────────────────────
+  - Weekly reconciliation review
+  - Monthly tier optimization
+  - Quarterly RWA rotation (T-Bill maturities)
+  - Annual strategic reallocation
+
+====================================================================
+PROOF-OF-RESERVE REQUIREMENTS
+====================================================================
+
+  PoR COMPONENTS:
+  ├── On-chain balances (real-time)
+  ├── CEX balance attestations (API + signature)
+  ├── Custodian balance attestations (daily)
+  ├── RWA valuations (weekly)
+  └── Third-party audit (monthly)
+
+  PoR HEALTH CHECKS:
+  ├── Total reserves >= total supply
+  ├── Each tier balance matches attestation
+  ├── Attestations not stale (< 24hr)
+  └── No reconciliation discrepancies
+
+  PoR FAILURE RESPONSE:
+  ├── Pause minting immediately
+  ├── Allow redemptions (from liquid tiers)
+  ├── Trigger investigation
+  └── Publish transparency report
+
+====================================================================
+RESERVE ACCOUNTING INVARIANTS
+====================================================================
+
+INV-RES-1: sum(all_tiers) >= totalSupply() at all times
+INV-RES-2: tier_balance[i] == attestation[i] for all tiers
+INV-RES-3: no single entity controls >1 duty
+INV-RES-4: all movements logged immutably
+INV-RES-5: redemption queue always serviced FIFO
+
+====================================================================
+INTEGRATION POINTS
+====================================================================
+
+→ SecureMintPolicy     : Gate minting based on PoR
+→ RedemptionEngine     : Process burn → payout
+→ OracleAggregator     : Feed reserve data
+→ RiskEngine           : Factor reserve health into risk score
+→ GovernanceEngine     : Parameter changes
+→ EvidenceLoggingEngine: Audit trail
+
+====================================================================
+END TREASURY RESERVE ARCHITECTURE
+====================================================================

@@ -1,0 +1,224 @@
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      network:
+        description: "Network to deploy to"
+        required: true
+        type: choice
+        options:
+          - sepolia
+          - mainnet
+          - arbitrum
+          - polygon
+          - base
+      contracts:
+        description: "Contracts to deploy (comma-separated or 'all')"
+        required: true
+        default: "all"
+        type: string
+      dry_run:
+        description: "Dry run (simulate only)"
+        required: false
+        type: boolean
+        default: true
+
+env:
+  FOUNDRY_PROFILE: ci
+
+jobs:
+  # ═══════════════════════════════════════════════════════════════════════════
+  # PRE-DEPLOYMENT CHECKS
+  # ═══════════════════════════════════════════════════════════════════════════
+  pre-deploy-checks:
+    name: Pre-Deployment Validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run all tests
+        run: |
+          forge test -vvv
+          npm run test
+
+      - name: Run invariant tests
+        run: forge test --match-contract Invariant -vvv
+
+      - name: Verify deployment configuration
+        run: |
+          echo "Network: ${{ github.event.inputs.network }}"
+          echo "Contracts: ${{ github.event.inputs.contracts }}"
+          echo "Dry Run: ${{ github.event.inputs.dry_run }}"
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # DEPLOYMENT
+  # ═══════════════════════════════════════════════════════════════════════════
+  deploy:
+    name: Deploy Contracts
+    runs-on: ubuntu-latest
+    needs: pre-deploy-checks
+    environment: ${{ github.event.inputs.network }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Deploy Oracle
+        if: contains(github.event.inputs.contracts, 'oracle') || github.event.inputs.contracts == 'all'
+        run: |
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            echo "DRY RUN: Would deploy Oracle to ${{ github.event.inputs.network }}"
+            npx hardhat run scripts/deploy/01_DeployOracle.ts --network hardhat
+          else
+            npx hardhat run scripts/deploy/01_DeployOracle.ts --network ${{ github.event.inputs.network }}
+          fi
+        env:
+          PRIVATE_KEY: ${{ secrets.DEPLOYER_PRIVATE_KEY }}
+          ADMIN_ADDRESS: ${{ secrets.ADMIN_ADDRESS }}
+          CHAINLINK_USDC_USD_FEED: ${{ vars.CHAINLINK_USDC_USD_FEED }}
+          MAINNET_RPC_URL: ${{ secrets.MAINNET_RPC_URL }}
+          SEPOLIA_RPC_URL: ${{ secrets.SEPOLIA_RPC_URL }}
+          ARBITRUM_RPC_URL: ${{ secrets.ARBITRUM_RPC_URL }}
+          POLYGON_RPC_URL: ${{ secrets.POLYGON_RPC_URL }}
+          BASE_RPC_URL: ${{ secrets.BASE_RPC_URL }}
+
+      - name: Deploy Treasury
+        if: contains(github.event.inputs.contracts, 'treasury') || github.event.inputs.contracts == 'all'
+        run: |
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            echo "DRY RUN: Would deploy Treasury to ${{ github.event.inputs.network }}"
+          else
+            npx hardhat run scripts/deploy/02_DeployTreasury.ts --network ${{ github.event.inputs.network }}
+          fi
+        env:
+          PRIVATE_KEY: ${{ secrets.DEPLOYER_PRIVATE_KEY }}
+          ADMIN_ADDRESS: ${{ secrets.ADMIN_ADDRESS }}
+          RESERVE_ASSET: ${{ vars.RESERVE_ASSET }}
+          MAINNET_RPC_URL: ${{ secrets.MAINNET_RPC_URL }}
+          SEPOLIA_RPC_URL: ${{ secrets.SEPOLIA_RPC_URL }}
+
+      - name: Deploy Token
+        if: contains(github.event.inputs.contracts, 'token') || github.event.inputs.contracts == 'all'
+        run: |
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            echo "DRY RUN: Would deploy Token to ${{ github.event.inputs.network }}"
+          else
+            npx hardhat run scripts/deploy/03_DeployToken.ts --network ${{ github.event.inputs.network }}
+          fi
+        env:
+          PRIVATE_KEY: ${{ secrets.DEPLOYER_PRIVATE_KEY }}
+          GUARDIAN_MULTISIG: ${{ secrets.GUARDIAN_MULTISIG }}
+          TOKEN_NAME: ${{ vars.TOKEN_NAME }}
+          TOKEN_SYMBOL: ${{ vars.TOKEN_SYMBOL }}
+          MAINNET_RPC_URL: ${{ secrets.MAINNET_RPC_URL }}
+          SEPOLIA_RPC_URL: ${{ secrets.SEPOLIA_RPC_URL }}
+
+      - name: Deploy Policy
+        if: contains(github.event.inputs.contracts, 'policy') || github.event.inputs.contracts == 'all'
+        run: |
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            echo "DRY RUN: Would deploy Policy to ${{ github.event.inputs.network }}"
+          else
+            npx hardhat run scripts/deploy/04_DeployPolicy.ts --network ${{ github.event.inputs.network }}
+          fi
+        env:
+          PRIVATE_KEY: ${{ secrets.DEPLOYER_PRIVATE_KEY }}
+          ADMIN_ADDRESS: ${{ secrets.ADMIN_ADDRESS }}
+          GLOBAL_SUPPLY_CAP: ${{ vars.GLOBAL_SUPPLY_CAP }}
+          EPOCH_MINT_CAP: ${{ vars.EPOCH_MINT_CAP }}
+          MAX_ORACLE_AGE: ${{ vars.MAX_ORACLE_AGE }}
+          MAINNET_RPC_URL: ${{ secrets.MAINNET_RPC_URL }}
+          SEPOLIA_RPC_URL: ${{ secrets.SEPOLIA_RPC_URL }}
+
+      - name: Upload deployment artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployments-${{ github.event.inputs.network }}
+          path: deployments/${{ github.event.inputs.network }}/
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # POST-DEPLOYMENT VERIFICATION
+  # ═══════════════════════════════════════════════════════════════════════════
+  verify:
+    name: Verify Contracts
+    runs-on: ubuntu-latest
+    needs: deploy
+    if: github.event.inputs.dry_run == 'false'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download deployment artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: deployments-${{ github.event.inputs.network }}
+          path: deployments/${{ github.event.inputs.network }}/
+
+      - name: Verify contracts on Etherscan
+        run: npx hardhat run scripts/deploy/07_VerifyAll.ts --network ${{ github.event.inputs.network }}
+        env:
+          ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
+          ARBISCAN_API_KEY: ${{ secrets.ARBISCAN_API_KEY }}
+          POLYGONSCAN_API_KEY: ${{ secrets.POLYGONSCAN_API_KEY }}
+          BASESCAN_API_KEY: ${{ secrets.BASESCAN_API_KEY }}
+          MAINNET_RPC_URL: ${{ secrets.MAINNET_RPC_URL }}
+          SEPOLIA_RPC_URL: ${{ secrets.SEPOLIA_RPC_URL }}
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # NOTIFICATION
+  # ═══════════════════════════════════════════════════════════════════════════
+  notify:
+    name: Send Notification
+    runs-on: ubuntu-latest
+    needs: [deploy, verify]
+    if: always()
+    steps:
+      - name: Notify on success
+        if: needs.deploy.result == 'success'
+        run: |
+          echo "Deployment to ${{ github.event.inputs.network }} completed successfully!"
+          # Add Slack/Discord notification here
+
+      - name: Notify on failure
+        if: needs.deploy.result == 'failure'
+        run: |
+          echo "Deployment to ${{ github.event.inputs.network }} failed!"
+          # Add Slack/Discord notification here

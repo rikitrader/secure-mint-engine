@@ -1,0 +1,229 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://securemint.io/schemas/deployment-registry.json",
+  "title": "SecureMint Multi-Chain Deployment Registry",
+  "description": "Registry of SecureMint protocol deployments across multiple chains",
+  "type": "object",
+  "required": ["version", "lastUpdated", "deployments"],
+  "properties": {
+    "version": {
+      "type": "string",
+      "description": "Registry schema version",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "lastUpdated": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Last update timestamp"
+    },
+    "deployments": {
+      "type": "object",
+      "description": "Map of chain ID to deployment info",
+      "additionalProperties": {
+        "$ref": "#/definitions/ChainDeployment"
+      }
+    },
+    "canonical": {
+      "type": "string",
+      "description": "Chain ID of the canonical/primary deployment",
+      "pattern": "^\\d+$"
+    }
+  },
+  "definitions": {
+    "ChainDeployment": {
+      "type": "object",
+      "required": ["chainId", "networkName", "contracts", "deployedAt", "status"],
+      "properties": {
+        "chainId": {
+          "type": "integer",
+          "description": "Chain ID"
+        },
+        "networkName": {
+          "type": "string",
+          "description": "Human-readable network name"
+        },
+        "contracts": {
+          "$ref": "#/definitions/ContractAddresses"
+        },
+        "deployedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Deployment timestamp"
+        },
+        "deployedBy": {
+          "type": "string",
+          "pattern": "^0x[a-fA-F0-9]{40}$",
+          "description": "Deployer address"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["active", "deprecated", "paused", "upgrading"],
+          "description": "Deployment status"
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$",
+          "description": "Contract version"
+        },
+        "verificationStatus": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string",
+            "enum": ["verified", "pending", "failed", "not_applicable"]
+          }
+        },
+        "subgraph": {
+          "type": "object",
+          "properties": {
+            "url": {
+              "type": "string",
+              "format": "uri"
+            },
+            "version": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string",
+              "enum": ["synced", "syncing", "error"]
+            }
+          }
+        },
+        "rpcEndpoints": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "uri"
+          }
+        },
+        "explorerUrls": {
+          "type": "object",
+          "properties": {
+            "main": {
+              "type": "string",
+              "format": "uri"
+            },
+            "api": {
+              "type": "string",
+              "format": "uri"
+            }
+          }
+        },
+        "bridgeContracts": {
+          "type": "object",
+          "description": "Cross-chain bridge contract addresses",
+          "additionalProperties": {
+            "type": "string",
+            "pattern": "^0x[a-fA-F0-9]{40}$"
+          }
+        },
+        "parameters": {
+          "$ref": "#/definitions/DeploymentParameters"
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    },
+    "ContractAddresses": {
+      "type": "object",
+      "required": [
+        "token",
+        "policy",
+        "oracle",
+        "treasury",
+        "redemption",
+        "governor",
+        "emergencyPause"
+      ],
+      "properties": {
+        "token": {
+          "$ref": "#/definitions/ContractInfo"
+        },
+        "policy": {
+          "$ref": "#/definitions/ContractInfo"
+        },
+        "oracle": {
+          "$ref": "#/definitions/ContractInfo"
+        },
+        "treasury": {
+          "$ref": "#/definitions/ContractInfo"
+        },
+        "redemption": {
+          "$ref": "#/definitions/ContractInfo"
+        },
+        "governor": {
+          "$ref": "#/definitions/ContractInfo"
+        },
+        "emergencyPause": {
+          "$ref": "#/definitions/ContractInfo"
+        },
+        "timelock": {
+          "$ref": "#/definitions/ContractInfo"
+        },
+        "proxyAdmin": {
+          "$ref": "#/definitions/ContractInfo"
+        }
+      }
+    },
+    "ContractInfo": {
+      "type": "object",
+      "required": ["address"],
+      "properties": {
+        "address": {
+          "type": "string",
+          "pattern": "^0x[a-fA-F0-9]{40}$"
+        },
+        "implementation": {
+          "type": "string",
+          "pattern": "^0x[a-fA-F0-9]{40}$",
+          "description": "Implementation address (for proxies)"
+        },
+        "deployTx": {
+          "type": "string",
+          "pattern": "^0x[a-fA-F0-9]{64}$"
+        },
+        "deployBlock": {
+          "type": "integer"
+        },
+        "upgradeable": {
+          "type": "boolean"
+        }
+      }
+    },
+    "DeploymentParameters": {
+      "type": "object",
+      "properties": {
+        "epochDuration": {
+          "type": "integer",
+          "description": "Epoch duration in seconds"
+        },
+        "epochCapacity": {
+          "type": "string",
+          "description": "Epoch mint capacity (in wei)"
+        },
+        "stalenessThreshold": {
+          "type": "integer",
+          "description": "Oracle staleness threshold in seconds"
+        },
+        "cooldownPeriod": {
+          "type": "integer",
+          "description": "Redemption cooldown in seconds"
+        },
+        "timelockDelay": {
+          "type": "integer",
+          "description": "Governance timelock delay in seconds"
+        },
+        "reserveAsset": {
+          "type": "string",
+          "pattern": "^0x[a-fA-F0-9]{40}$",
+          "description": "Reserve asset (e.g., USDC) address"
+        },
+        "chainlinkFeed": {
+          "type": "string",
+          "pattern": "^0x[a-fA-F0-9]{40}$",
+          "description": "Chainlink PoR feed address"
+        }
+      }
+    }
+  }
+}

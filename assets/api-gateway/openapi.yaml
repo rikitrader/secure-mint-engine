@@ -1,0 +1,596 @@
+openapi: 3.1.0
+info:
+  title: SecureMint Engine API
+  description: |
+    REST API for SecureMint Engine - Oracle-gated secure minting system.
+
+    ## Authentication
+    All endpoints (except /health) require authentication via:
+    - **Bearer Token**: JWT token in Authorization header
+    - **Signature**: Ethereum signature authentication
+
+    ## Rate Limiting
+    - 100 requests per minute per API key
+    - 1000 requests per minute for premium keys
+
+    ## Error Codes
+    - 400: Bad Request - Invalid parameters
+    - 401: Unauthorized - Missing or invalid authentication
+    - 403: Forbidden - Insufficient permissions
+    - 429: Too Many Requests - Rate limit exceeded
+    - 500: Internal Server Error
+  version: 1.0.0
+  contact:
+    name: SecureMint Team
+    url: https://securemint.io
+    email: api@securemint.io
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://api.securemint.io
+    description: Production
+  - url: https://api-staging.securemint.io
+    description: Staging
+  - url: http://localhost:3000
+    description: Local Development
+
+tags:
+  - name: Health
+    description: Health check endpoints
+  - name: Token
+    description: Token information and operations
+  - name: Mint
+    description: Minting operations
+  - name: Burn
+    description: Burning operations
+  - name: Oracle
+    description: Oracle data and status
+  - name: Treasury
+    description: Treasury information
+  - name: Compliance
+    description: Compliance checking
+  - name: Bridge
+    description: Cross-chain bridge operations
+
+security:
+  - bearerAuth: []
+  - signatureAuth: []
+
+paths:
+  /health:
+    get:
+      tags:
+        - Health
+      summary: Health check
+      description: Returns the health status of the API
+      security: []
+      responses:
+        '200':
+          description: API is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /api/token:
+    get:
+      tags:
+        - Token
+      summary: Get token information
+      description: Returns token metadata including name, symbol, decimals, and total supply
+      responses:
+        '200':
+          description: Token information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenInfo'
+
+  /api/token/balance/{address}:
+    get:
+      tags:
+        - Token
+      summary: Get balance for address
+      parameters:
+        - name: address
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^0x[a-fA-F0-9]{40}$'
+          description: Ethereum address
+      responses:
+        '200':
+          description: Balance information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BalanceResponse'
+
+  /api/mint/simulate:
+    post:
+      tags:
+        - Mint
+      summary: Simulate a mint operation
+      description: |
+        Simulates a mint operation without executing it.
+        Checks all invariants and returns estimated gas.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MintRequest'
+      responses:
+        '200':
+          description: Simulation result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MintSimulationResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/mint/execute:
+    post:
+      tags:
+        - Mint
+      summary: Execute a mint operation
+      description: Executes a mint with a pre-signed transaction
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MintExecuteRequest'
+      responses:
+        '200':
+          description: Mint executed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransactionResponse'
+
+  /api/mint/capacity:
+    get:
+      tags:
+        - Mint
+      summary: Get epoch minting capacity
+      responses:
+        '200':
+          description: Capacity information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CapacityResponse'
+
+  /api/mint/batch:
+    post:
+      tags:
+        - Mint
+      summary: Batch mint simulation
+      description: Simulate multiple mint operations at once (max 100)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BatchMintRequest'
+      responses:
+        '200':
+          description: Batch simulation results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchMintResponse'
+
+  /api/burn/simulate:
+    post:
+      tags:
+        - Burn
+      summary: Simulate a burn operation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BurnRequest'
+      responses:
+        '200':
+          description: Simulation result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BurnSimulationResponse'
+
+  /api/oracle/status:
+    get:
+      tags:
+        - Oracle
+      summary: Get oracle status
+      responses:
+        '200':
+          description: Oracle status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OracleStatus'
+
+  /api/oracle/backing:
+    get:
+      tags:
+        - Oracle
+      summary: Get current backing value
+      responses:
+        '200':
+          description: Backing data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BackingData'
+
+  /api/treasury/balances:
+    get:
+      tags:
+        - Treasury
+      summary: Get treasury balances
+      responses:
+        '200':
+          description: Treasury balances by tier
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TreasuryBalances'
+
+  /api/compliance/check:
+    post:
+      tags:
+        - Compliance
+      summary: Check address compliance
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ComplianceCheckRequest'
+      responses:
+        '200':
+          description: Compliance check result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComplianceCheckResponse'
+
+  /api/invariants:
+    get:
+      tags:
+        - Token
+      summary: Check all invariants
+      responses:
+        '200':
+          description: Invariant check results
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/InvariantResult'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    signatureAuth:
+      type: apiKey
+      in: header
+      name: Authorization
+      description: 'Signature base64(message):signature'
+
+  schemas:
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: ok
+        timestamp:
+          type: string
+          format: date-time
+        version:
+          type: string
+          example: 1.0.0
+
+    TokenInfo:
+      type: object
+      properties:
+        address:
+          type: string
+          example: '0x1234567890123456789012345678901234567890'
+        name:
+          type: string
+          example: SecureMint USD
+        symbol:
+          type: string
+          example: smUSD
+        decimals:
+          type: integer
+          example: 6
+        totalSupply:
+          type: string
+          example: '1000000000000'
+
+    BalanceResponse:
+      type: object
+      properties:
+        address:
+          type: string
+        balance:
+          type: string
+        formattedBalance:
+          type: string
+
+    MintRequest:
+      type: object
+      required:
+        - recipient
+        - amount
+      properties:
+        recipient:
+          type: string
+          pattern: '^0x[a-fA-F0-9]{40}$'
+        amount:
+          type: string
+          description: Amount in smallest unit (e.g., 1000000 for 1 USDC)
+
+    MintSimulationResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        reason:
+          type: string
+        recipient:
+          type: string
+        amount:
+          type: string
+        estimatedGas:
+          type: string
+        epochCapacity:
+          type: string
+        epochMinted:
+          type: string
+        remainingCapacity:
+          type: string
+
+    MintExecuteRequest:
+      type: object
+      required:
+        - recipient
+        - amount
+        - signedTransaction
+      properties:
+        recipient:
+          type: string
+        amount:
+          type: string
+        signedTransaction:
+          type: string
+
+    TransactionResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        transactionHash:
+          type: string
+        blockNumber:
+          type: integer
+        gasUsed:
+          type: string
+
+    CapacityResponse:
+      type: object
+      properties:
+        epochCapacity:
+          type: string
+        epochMinted:
+          type: string
+        remainingCapacity:
+          type: string
+        utilizationPercent:
+          type: number
+        epochDuration:
+          type: string
+        currentEpoch:
+          type: string
+
+    BatchMintRequest:
+      type: object
+      required:
+        - requests
+      properties:
+        requests:
+          type: array
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/MintRequest'
+
+    BatchMintResponse:
+      type: object
+      properties:
+        total:
+          type: integer
+        successful:
+          type: integer
+        failed:
+          type: integer
+        results:
+          type: array
+          items:
+            type: object
+            properties:
+              index:
+                type: integer
+              recipient:
+                type: string
+              amount:
+                type: string
+              canMint:
+                type: boolean
+              reason:
+                type: string
+
+    BurnRequest:
+      type: object
+      required:
+        - amount
+      properties:
+        amount:
+          type: string
+
+    BurnSimulationResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        amount:
+          type: string
+        estimatedGas:
+          type: string
+
+    OracleStatus:
+      type: object
+      properties:
+        address:
+          type: string
+        isActive:
+          type: boolean
+        lastUpdate:
+          type: string
+          format: date-time
+        stalenessThreshold:
+          type: integer
+        currentRoundId:
+          type: string
+
+    BackingData:
+      type: object
+      properties:
+        totalBacking:
+          type: string
+        backingRatio:
+          type: number
+        lastUpdate:
+          type: string
+          format: date-time
+        oracleSource:
+          type: string
+        isStale:
+          type: boolean
+
+    TreasuryBalances:
+      type: object
+      properties:
+        tier1Balance:
+          type: string
+        tier2Balance:
+          type: string
+        tier3Balance:
+          type: string
+        tier4Balance:
+          type: string
+        totalReserves:
+          type: string
+        utilizationRate:
+          type: number
+
+    ComplianceCheckRequest:
+      type: object
+      required:
+        - addresses
+      properties:
+        addresses:
+          type: array
+          items:
+            type: string
+        checkKYC:
+          type: boolean
+          default: true
+        checkAML:
+          type: boolean
+          default: true
+        checkSanctions:
+          type: boolean
+          default: true
+
+    ComplianceCheckResponse:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            type: object
+            properties:
+              address:
+                type: string
+              isCompliant:
+                type: boolean
+              kycStatus:
+                type: string
+              amlRiskScore:
+                type: number
+              sanctionsMatch:
+                type: boolean
+
+    InvariantResult:
+      type: object
+      properties:
+        id:
+          type: string
+          example: INV-SM-1
+        name:
+          type: string
+          example: Solvency
+        passed:
+          type: boolean
+        currentValue:
+          type: string
+        threshold:
+          type: string
+        lastChecked:
+          type: string
+          format: date-time
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        code:
+          type: string
+
+  responses:
+    BadRequest:
+      description: Bad Request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    RateLimited:
+      description: Rate limit exceeded
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'

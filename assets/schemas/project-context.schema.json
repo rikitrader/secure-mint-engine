@@ -1,0 +1,340 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://securemint.engine/schemas/project-context.json",
+  "title": "Secure Mint Engine Project Context",
+  "description": "Schema for validating project configuration for oracle-gated secure minting systems",
+  "type": "object",
+  "required": [
+    "project_name",
+    "money_mechanic_type",
+    "backing",
+    "token_config",
+    "governance"
+  ],
+  "properties": {
+    "project_name": {
+      "type": "string",
+      "description": "Name of the token project",
+      "minLength": 1,
+      "maxLength": 100
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Semantic version of the configuration"
+    },
+    "money_mechanic_type": {
+      "type": "string",
+      "enum": [
+        "stablecoin_backed",
+        "rwa_backed",
+        "commodity_backed",
+        "yield_bearing_backed",
+        "algorithmic",
+        "utility_token",
+        "governance_token"
+      ],
+      "description": "Type of monetary mechanism"
+    },
+    "backing": {
+      "type": "object",
+      "required": ["type", "assets", "verification"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["fiat", "crypto", "rwa", "mixed", "none"],
+          "description": "Primary backing type"
+        },
+        "assets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "type", "allocation"],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string",
+                "enum": ["fiat_equivalent", "stablecoin", "treasury", "real_estate", "commodities", "crypto"]
+              },
+              "allocation": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100
+              },
+              "custodian": {
+                "type": "string"
+              },
+              "audit_frequency": {
+                "type": "string",
+                "enum": ["real_time", "daily", "weekly", "monthly", "quarterly"]
+              }
+            }
+          },
+          "minItems": 1
+        },
+        "verification": {
+          "type": "object",
+          "required": ["method"],
+          "properties": {
+            "method": {
+              "type": "string",
+              "enum": ["proof_of_reserve", "attestation", "audit", "none"]
+            },
+            "oracle_type": {
+              "type": "string",
+              "enum": ["chainlink_por", "custom_oracle", "multi_attestor", "none"]
+            },
+            "min_attestors": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "update_frequency": {
+              "type": "string"
+            }
+          }
+        },
+        "ratio": {
+          "type": "number",
+          "minimum": 100,
+          "maximum": 200,
+          "description": "Required backing ratio in percentage (100 = 1:1)"
+        }
+      }
+    },
+    "token_config": {
+      "type": "object",
+      "required": ["name", "symbol", "decimals"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "symbol": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 11,
+          "pattern": "^[A-Z0-9]+$"
+        },
+        "decimals": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 18
+        },
+        "global_supply_cap": {
+          "type": "string",
+          "pattern": "^[0-9]+$",
+          "description": "Maximum total supply in wei"
+        },
+        "epoch_mint_cap": {
+          "type": "string",
+          "pattern": "^[0-9]+$",
+          "description": "Maximum mint per epoch in wei"
+        },
+        "epoch_duration": {
+          "type": "integer",
+          "minimum": 60,
+          "description": "Epoch duration in seconds"
+        }
+      }
+    },
+    "oracle_config": {
+      "type": "object",
+      "properties": {
+        "max_age": {
+          "type": "integer",
+          "minimum": 60,
+          "maximum": 86400,
+          "description": "Maximum oracle data age in seconds"
+        },
+        "chainlink_feed": {
+          "type": "string",
+          "pattern": "^0x[a-fA-F0-9]{40}$"
+        },
+        "por_feed": {
+          "type": "string",
+          "pattern": "^0x[a-fA-F0-9]{40}$"
+        },
+        "fallback_oracle": {
+          "type": "string",
+          "pattern": "^0x[a-fA-F0-9]{40}$"
+        }
+      }
+    },
+    "treasury": {
+      "type": "object",
+      "properties": {
+        "tiers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "allocation", "liquidity"],
+            "properties": {
+              "name": {
+                "type": "string",
+                "enum": ["HOT", "WARM", "COLD", "RWA"]
+              },
+              "allocation": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10000,
+                "description": "Allocation in basis points"
+              },
+              "liquidity": {
+                "type": "string",
+                "enum": ["instant", "hours", "days", "weeks"]
+              },
+              "strategy": {
+                "type": "string"
+              }
+            }
+          },
+          "minItems": 1,
+          "maxItems": 4
+        },
+        "rebalance_threshold": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 1000,
+          "description": "Rebalance trigger threshold in basis points"
+        }
+      }
+    },
+    "governance": {
+      "type": "object",
+      "required": ["guardian_multisig"],
+      "properties": {
+        "guardian_multisig": {
+          "type": "string",
+          "pattern": "^0x[a-fA-F0-9]{40}$"
+        },
+        "governor_multisig": {
+          "type": "string",
+          "pattern": "^0x[a-fA-F0-9]{40}$"
+        },
+        "voting_delay": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "voting_period": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "proposal_threshold": {
+          "type": "string",
+          "pattern": "^[0-9]+$"
+        },
+        "quorum_percentage": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "timelock": {
+          "type": "object",
+          "properties": {
+            "standard_delay": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "critical_delay": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "emergency_delay": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        }
+      }
+    },
+    "fees": {
+      "type": "object",
+      "properties": {
+        "mint_fee_bps": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000
+        },
+        "redemption_fee_bps": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000
+        },
+        "depeg_surcharge_bps": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 5000
+        }
+      }
+    },
+    "networks": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "chain_id": {
+            "type": "integer"
+          },
+          "rpc_url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "contracts": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "pattern": "^0x[a-fA-F0-9]{40}$"
+            }
+          }
+        }
+      }
+    },
+    "risk_parameters": {
+      "type": "object",
+      "properties": {
+        "circuit_breaker_threshold": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "max_single_mint": {
+          "type": "string",
+          "pattern": "^[0-9]+$"
+        },
+        "max_daily_mint": {
+          "type": "string",
+          "pattern": "^[0-9]+$"
+        },
+        "redemption_delay": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    }
+  },
+  "if": {
+    "properties": {
+      "money_mechanic_type": {
+        "enum": ["stablecoin_backed", "rwa_backed", "commodity_backed", "yield_bearing_backed"]
+      }
+    }
+  },
+  "then": {
+    "properties": {
+      "backing": {
+        "properties": {
+          "verification": {
+            "properties": {
+              "method": {
+                "enum": ["proof_of_reserve", "attestation", "audit"]
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

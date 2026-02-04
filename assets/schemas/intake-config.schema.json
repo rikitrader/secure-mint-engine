@@ -1,0 +1,406 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://securemint.com/schemas/intake-config.json",
+  "title": "SecureMint Intake Configuration",
+  "description": "Configuration schema for SecureMint Engine deployment",
+  "type": "object",
+  "required": ["version", "project", "deployment", "permissions", "parameters"],
+  "properties": {
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Configuration schema version"
+    },
+    "generatedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when configuration was generated"
+    },
+    "project": {
+      "type": "object",
+      "required": ["name", "token"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{2,30}$",
+          "description": "Project identifier (lowercase, alphanumeric with hyphens)"
+        },
+        "token": {
+          "type": "object",
+          "required": ["name", "symbol", "decimals"],
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 50,
+              "description": "Token name (e.g., 'Acme USD')"
+            },
+            "symbol": {
+              "type": "string",
+              "pattern": "^[A-Z]{3,5}$",
+              "description": "Token symbol (3-5 uppercase letters)"
+            },
+            "decimals": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 18,
+              "default": 18,
+              "description": "Token decimal places"
+            }
+          }
+        },
+        "backing": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": ["FIAT_USD", "FIAT_EUR", "CRYPTO_USDC", "CRYPTO_USDT", "REAL_ESTATE", "COMMODITIES", "MIXED"],
+              "description": "Type of backing asset"
+            },
+            "initialAmount": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Initial backing amount"
+            }
+          }
+        }
+      }
+    },
+    "deployment": {
+      "type": "object",
+      "required": ["environment", "rpcUrl"],
+      "properties": {
+        "environment": {
+          "type": "string",
+          "enum": ["LOCAL", "TESTNET_SEPOLIA", "TESTNET_GOERLI", "MAINNET_ETHEREUM", "MAINNET_POLYGON", "MAINNET_ARBITRUM", "MAINNET_OPTIMISM", "MAINNET_BASE"],
+          "description": "Target deployment environment"
+        },
+        "rpcUrl": {
+          "type": "string",
+          "format": "uri",
+          "description": "RPC endpoint URL"
+        },
+        "explorerType": {
+          "type": "string",
+          "enum": ["ETHERSCAN", "POLYGONSCAN", "ARBISCAN", "OPTIMISTIC_ETHERSCAN", "BASESCAN", "NONE"],
+          "description": "Block explorer for contract verification"
+        },
+        "explorerApiKey": {
+          "type": "string",
+          "description": "Block explorer API key"
+        },
+        "useProxy": {
+          "type": "boolean",
+          "default": true,
+          "description": "Use UUPS proxy pattern for upgradability"
+        }
+      }
+    },
+    "permissions": {
+      "type": "object",
+      "required": ["admin", "guardians", "minters"],
+      "properties": {
+        "admin": {
+          "type": "string",
+          "pattern": "^0x[a-fA-F0-9]{40}$",
+          "description": "Admin address (should be Gnosis Safe)"
+        },
+        "adminIsSafe": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether admin is a Gnosis Safe"
+        },
+        "safeThreshold": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10,
+          "default": 3,
+          "description": "Gnosis Safe signature threshold"
+        },
+        "guardians": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^0x[a-fA-F0-9]{40}$"
+          },
+          "minItems": 1,
+          "maxItems": 5,
+          "description": "Guardian addresses for emergency pause"
+        },
+        "minters": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^0x[a-fA-F0-9]{40}$"
+          },
+          "minItems": 1,
+          "maxItems": 10,
+          "description": "Initial minter addresses"
+        }
+      }
+    },
+    "storage": {
+      "type": "object",
+      "properties": {
+        "postgresql": {
+          "type": "string",
+          "description": "PostgreSQL connection string"
+        },
+        "redis": {
+          "type": "string",
+          "description": "Redis connection string"
+        },
+        "subgraphUrl": {
+          "type": "string",
+          "format": "uri",
+          "description": "The Graph subgraph URL"
+        },
+        "useIpfs": {
+          "type": "boolean",
+          "default": false,
+          "description": "Use IPFS for metadata storage"
+        },
+        "backupRetentionDays": {
+          "type": "integer",
+          "minimum": 7,
+          "maximum": 365,
+          "default": 30,
+          "description": "Backup retention period in days"
+        }
+      }
+    },
+    "integrations": {
+      "type": "object",
+      "properties": {
+        "chainlink": {
+          "type": "object",
+          "properties": {
+            "oracleAddress": {
+              "type": "string",
+              "pattern": "^0x[a-fA-F0-9]{40}$",
+              "description": "Chainlink oracle feed address"
+            },
+            "stalenessThreshold": {
+              "type": "integer",
+              "minimum": 60,
+              "maximum": 86400,
+              "default": 3600,
+              "description": "Oracle staleness threshold in seconds"
+            }
+          }
+        },
+        "tenderly": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "Enable Tenderly simulation"
+            },
+            "apiKey": {
+              "type": "string",
+              "description": "Tenderly API key"
+            }
+          }
+        },
+        "bridge": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "Enable cross-chain bridging"
+            },
+            "chains": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": ["POLYGON", "ARBITRUM", "OPTIMISM", "BASE"]
+              },
+              "description": "Target bridge chains"
+            }
+          }
+        }
+      }
+    },
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "epochDuration": {
+          "type": "integer",
+          "minimum": 300,
+          "maximum": 86400,
+          "default": 3600,
+          "description": "Epoch duration in seconds"
+        },
+        "epochCapacity": {
+          "type": "integer",
+          "minimum": 1000,
+          "default": 1000000,
+          "description": "Maximum mint amount per epoch"
+        },
+        "minMintAmount": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 100,
+          "description": "Minimum mint amount"
+        },
+        "maxMintAmount": {
+          "type": "integer",
+          "minimum": 1000,
+          "default": 10000000,
+          "description": "Maximum single mint amount"
+        },
+        "autoAdjustCapacity": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically adjust epoch capacity"
+        }
+      }
+    },
+    "compliance": {
+      "type": "object",
+      "properties": {
+        "kycRequired": {
+          "type": "boolean",
+          "default": false,
+          "description": "Require KYC/AML verification"
+        },
+        "kycProvider": {
+          "type": "string",
+          "enum": ["CHAINALYSIS", "ELLIPTIC", "TRM", "CUSTOM"],
+          "description": "KYC provider"
+        },
+        "blockedJurisdictions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Z]{2}$"
+          },
+          "default": ["KP", "IR", "CU", "SY"],
+          "description": "Blocked jurisdictions (ISO 3166-1 alpha-2)"
+        },
+        "monitoringThreshold": {
+          "type": "number",
+          "minimum": 0,
+          "default": 10000,
+          "description": "Transaction monitoring threshold (USD)"
+        },
+        "regulatoryReporting": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable regulatory reporting"
+        },
+        "frameworks": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["US_MSB", "EU_MICA", "UK_FCA", "SG_MAS", "OTHER"]
+          },
+          "description": "Applicable regulatory frameworks"
+        }
+      }
+    },
+    "observability": {
+      "type": "object",
+      "properties": {
+        "monitoring": {
+          "type": "string",
+          "enum": ["PROMETHEUS_GRAFANA", "DATADOG", "NEW_RELIC", "CLOUDWATCH", "NONE"],
+          "default": "PROMETHEUS_GRAFANA",
+          "description": "Monitoring system"
+        },
+        "alerting": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["SLACK", "PAGERDUTY", "OPSGENIE", "EMAIL", "TELEGRAM", "DISCORD"]
+          },
+          "default": ["SLACK"],
+          "description": "Alerting channels"
+        },
+        "slackWebhook": {
+          "type": "string",
+          "format": "uri",
+          "description": "Slack webhook URL"
+        },
+        "pagerdutyKey": {
+          "type": "string",
+          "description": "PagerDuty integration key"
+        },
+        "logRetentionDays": {
+          "type": "integer",
+          "minimum": 7,
+          "maximum": 365,
+          "default": 90,
+          "description": "Log retention period in days"
+        },
+        "tracing": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable distributed tracing (OpenTelemetry)"
+        },
+        "errorTracking": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable error tracking (Sentry)"
+        },
+        "sentryDsn": {
+          "type": "string",
+          "format": "uri",
+          "description": "Sentry DSN"
+        }
+      }
+    },
+    "acceptanceCriteria": {
+      "type": "object",
+      "properties": {
+        "minBackingRatio": {
+          "type": "number",
+          "minimum": 100,
+          "maximum": 200,
+          "default": 100,
+          "description": "Minimum backing ratio percentage"
+        },
+        "maxOracleLatency": {
+          "type": "integer",
+          "minimum": 60,
+          "maximum": 86400,
+          "default": 3600,
+          "description": "Maximum oracle latency in seconds"
+        },
+        "targetApiResponseTime": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 5000,
+          "default": 500,
+          "description": "Target API p95 response time in ms"
+        },
+        "targetUptime": {
+          "type": "number",
+          "minimum": 99,
+          "maximum": 99.999,
+          "default": 99.9,
+          "description": "Target uptime percentage"
+        },
+        "requiredTestCoverage": {
+          "type": "number",
+          "minimum": 80,
+          "maximum": 100,
+          "default": 95,
+          "description": "Required test coverage percentage"
+        },
+        "auditCompleted": {
+          "type": "boolean",
+          "default": false,
+          "description": "Security audit completed"
+        },
+        "auditReportUrl": {
+          "type": "string",
+          "format": "uri",
+          "description": "Security audit report URL"
+        }
+      }
+    }
+  }
+}

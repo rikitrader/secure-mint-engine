@@ -1,0 +1,198 @@
+{
+  "version": "1.0.0",
+  "lastUpdated": "2024-01-01T00:00:00Z",
+  "canonical": "1",
+  "deployments": {
+    "1": {
+      "chainId": 1,
+      "networkName": "Ethereum Mainnet",
+      "contracts": {
+        "token": {
+          "address": "0x0000000000000000000000000000000000000000",
+          "deployBlock": 0,
+          "upgradeable": false
+        },
+        "policy": {
+          "address": "0x0000000000000000000000000000000000000000",
+          "implementation": "0x0000000000000000000000000000000000000000",
+          "deployBlock": 0,
+          "upgradeable": true
+        },
+        "oracle": {
+          "address": "0x0000000000000000000000000000000000000000",
+          "deployBlock": 0,
+          "upgradeable": false
+        },
+        "treasury": {
+          "address": "0x0000000000000000000000000000000000000000",
+          "deployBlock": 0,
+          "upgradeable": true
+        },
+        "redemption": {
+          "address": "0x0000000000000000000000000000000000000000",
+          "deployBlock": 0,
+          "upgradeable": false
+        },
+        "governor": {
+          "address": "0x0000000000000000000000000000000000000000",
+          "deployBlock": 0,
+          "upgradeable": false
+        },
+        "emergencyPause": {
+          "address": "0x0000000000000000000000000000000000000000",
+          "deployBlock": 0,
+          "upgradeable": false
+        },
+        "timelock": {
+          "address": "0x0000000000000000000000000000000000000000",
+          "deployBlock": 0,
+          "upgradeable": false
+        }
+      },
+      "deployedAt": "2024-01-01T00:00:00Z",
+      "deployedBy": "0x0000000000000000000000000000000000000000",
+      "status": "active",
+      "version": "1.0.0",
+      "verificationStatus": {
+        "token": "pending",
+        "policy": "pending",
+        "oracle": "pending",
+        "treasury": "pending",
+        "redemption": "pending",
+        "governor": "pending",
+        "emergencyPause": "pending"
+      },
+      "subgraph": {
+        "url": "https://api.thegraph.com/subgraphs/name/your-org/securemint-mainnet",
+        "version": "1.0.0",
+        "status": "syncing"
+      },
+      "rpcEndpoints": [
+        "https://eth-mainnet.g.alchemy.com/v2/YOUR_KEY",
+        "https://mainnet.infura.io/v3/YOUR_KEY"
+      ],
+      "explorerUrls": {
+        "main": "https://etherscan.io",
+        "api": "https://api.etherscan.io"
+      },
+      "parameters": {
+        "epochDuration": 86400,
+        "epochCapacity": "10000000000000000000000000",
+        "stalenessThreshold": 3600,
+        "cooldownPeriod": 86400,
+        "timelockDelay": 86400,
+        "reserveAsset": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+        "chainlinkFeed": "0x0000000000000000000000000000000000000000"
+      },
+      "notes": "Production mainnet deployment - PLACEHOLDER ADDRESSES"
+    },
+    "11155111": {
+      "chainId": 11155111,
+      "networkName": "Sepolia Testnet",
+      "contracts": {
+        "token": {
+          "address": "0x0000000000000000000000000000000000000000",
+          "deployBlock": 0,
+          "upgradeable": false
+        },
+        "policy": {
+          "address": "0x0000000000000000000000000000000000000000",
+          "deployBlock": 0,
+          "upgradeable": true
+        },
+        "oracle": {
+          "address": "0x0000000000000000000000000000000000000000",
+          "deployBlock": 0,
+          "upgradeable": false
+        },
+        "treasury": {
+          "address": "0x0000000000000000000000000000000000000000",
+          "deployBlock": 0,
+          "upgradeable": true
+        },
+        "redemption": {
+          "address": "0x0000000000000000000000000000000000000000",
+          "deployBlock": 0,
+          "upgradeable": false
+        },
+        "governor": {
+          "address": "0x0000000000000000000000000000000000000000",
+          "deployBlock": 0,
+          "upgradeable": false
+        },
+        "emergencyPause": {
+          "address": "0x0000000000000000000000000000000000000000",
+          "deployBlock": 0,
+          "upgradeable": false
+        }
+      },
+      "deployedAt": "2024-01-01T00:00:00Z",
+      "deployedBy": "0x0000000000000000000000000000000000000000",
+      "status": "active",
+      "version": "1.0.0",
+      "rpcEndpoints": [
+        "https://eth-sepolia.g.alchemy.com/v2/YOUR_KEY"
+      ],
+      "explorerUrls": {
+        "main": "https://sepolia.etherscan.io",
+        "api": "https://api-sepolia.etherscan.io"
+      },
+      "parameters": {
+        "epochDuration": 3600,
+        "epochCapacity": "1000000000000000000000000",
+        "stalenessThreshold": 3600,
+        "cooldownPeriod": 300,
+        "timelockDelay": 300
+      },
+      "notes": "Testnet deployment with shorter timelocks for testing"
+    },
+    "8453": {
+      "chainId": 8453,
+      "networkName": "Base",
+      "contracts": {
+        "token": {
+          "address": "0x0000000000000000000000000000000000000000",
+          "upgradeable": false
+        },
+        "policy": {
+          "address": "0x0000000000000000000000000000000000000000",
+          "upgradeable": true
+        },
+        "oracle": {
+          "address": "0x0000000000000000000000000000000000000000",
+          "upgradeable": false
+        },
+        "treasury": {
+          "address": "0x0000000000000000000000000000000000000000",
+          "upgradeable": true
+        },
+        "redemption": {
+          "address": "0x0000000000000000000000000000000000000000",
+          "upgradeable": false
+        },
+        "governor": {
+          "address": "0x0000000000000000000000000000000000000000",
+          "upgradeable": false
+        },
+        "emergencyPause": {
+          "address": "0x0000000000000000000000000000000000000000",
+          "upgradeable": false
+        }
+      },
+      "deployedAt": "2024-01-01T00:00:00Z",
+      "status": "active",
+      "version": "1.0.0",
+      "rpcEndpoints": [
+        "https://mainnet.base.org"
+      ],
+      "explorerUrls": {
+        "main": "https://basescan.org",
+        "api": "https://api.basescan.org"
+      },
+      "bridgeContracts": {
+        "mainnet": "0x0000000000000000000000000000000000000000"
+      },
+      "notes": "Base L2 deployment - PLACEHOLDER ADDRESSES"
+    }
+  }
+}

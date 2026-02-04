@@ -1,0 +1,40 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+
+# Environment
+.env
+!.env.example
+
+# Coverage
+coverage/
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+
+# Logs
+*.log
+npm-debug.log*
+logs/
+
+# Database
+*.sqlite
+*.db
+
+# Prisma
+prisma/migrations/*_migration_lock.toml
+
+# Test
+jest-results/
+
+# Temp
+tmp/
+temp/
+uploads/

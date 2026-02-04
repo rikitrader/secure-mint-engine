@@ -1,0 +1,291 @@
+====================================================================
+             STABLECOIN PEG STABILITY MECHANICS
+====================================================================
+
+GOAL:
+Keep price = $1.00 using layered defenses:
+- Arbitrage pathways
+- Liquidity depth
+- Mint/burn controls
+- Reserve management
+- Emergency tools
+
+====================================================================
+PEG DEFENSE LAYERS (Outside → Inside)
+====================================================================
+
+┌────────────────────────────────────────────────────────────────────┐
+│ LAYER 1: PRIMARY REDEMPTION (STRONGEST DEFENSE)                    │
+├────────────────────────────────────────────────────────────────────┤
+│                                                                    │
+│  IF token < $1.00:                                                 │
+│  ├── Arbitrageurs buy cheap token on market                        │
+│  ├── Redeem for $1.00 worth of reserves                            │
+│  ├── Pocket profit = ($1.00 - market_price)                        │
+│  └── Buying pressure pushes price UP toward $1.00                  │
+│                                                                    │
+│  IF token > $1.00:                                                 │
+│  ├── Arbitrageurs mint new tokens at $1.00 (if reserves exist)     │
+│  ├── Sell on market for > $1.00                                    │
+│  ├── Pocket profit = (market_price - $1.00)                        │
+│  └── Selling pressure pushes price DOWN toward $1.00               │
+│                                                                    │
+│  EFFECTIVENESS: 99%+ of peg maintenance                            │
+└────────────────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────────────┐
+│ LAYER 2: LIQUIDITY SUPPORT                                         │
+├────────────────────────────────────────────────────────────────────┤
+│                                                                    │
+│  Deep pools on major DEX/AMM:                                      │
+│  ├── Uniswap V3 concentrated liquidity                             │
+│  ├── Curve 3pool / stableswap                                      │
+│  ├── Balancer composable stable pools                              │
+│  └── Centralized exchange order books                              │
+│                                                                    │
+│  Market maker inventory:                                           │
+│  ├── Professional MMs with inventory commitment                    │
+│  ├── Protocol-owned liquidity (POL)                                │
+│  └── Incentivized LP programs                                      │
+│                                                                    │
+│  Slippage protection:                                              │
+│  ├── $1M trade < 0.1% slippage (target)                            │
+│  └── $10M trade < 0.5% slippage (target)                           │
+│                                                                    │
+└────────────────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────────────┐
+│ LAYER 3: POLICY CONTROL (ADAPTIVE)                                 │
+├────────────────────────────────────────────────────────────────────┤
+│                                                                    │
+│  Mint rate limits:                                                 │
+│  ├── Per-hour cap                                                  │
+│  ├── Per-day cap                                                   │
+│  └── Tightened during high volatility                              │
+│                                                                    │
+│  Dynamic fees:                                                     │
+│  ├── Base mint fee: 0.1%                                           │
+│  ├── Base burn fee: 0.1%                                           │
+│  ├── Depeg surcharge: +0.5% if |price - $1| > 2%                   │
+│  └── Fee rebates for stabilizing actions                           │
+│                                                                    │
+│  Collateral factor adjustments:                                    │
+│  ├── Increase required collateral during stress                    │
+│  └── Decrease during stable periods (governance)                   │
+│                                                                    │
+│  Min health factor:                                                │
+│  ├── Standard: 1.0 (100% backed)                                   │
+│  ├── Conservative: 1.05 (105% backed)                              │
+│  └── Stress mode: 1.10 (110% backed)                               │
+│                                                                    │
+└────────────────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────────────┐
+│ LAYER 4: RESERVE REBALANCING                                       │
+├────────────────────────────────────────────────────────────────────┤
+│                                                                    │
+│  Redemption spike response:                                        │
+│  ├── Move Tier2 → Tier0 liquidity                                  │
+│  ├── Liquidate RWA positions if needed                             │
+│  └── Pre-position based on volume signals                          │
+│                                                                    │
+│  Volatile collateral hedge:                                        │
+│  ├── If collateral is crypto (ETH/BTC)                             │
+│  ├── Delta-hedge exposure                                          │
+│  └── Maintain overcollateralization buffer                         │
+│                                                                    │
+└────────────────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────────────┐
+│ LAYER 5: EMERGENCY TOOLS (LAST RESORT)                             │
+├────────────────────────────────────────────────────────────────────┤
+│                                                                    │
+│  Pause minting:                                                    │
+│  ├── Stop supply expansion                                         │
+│  └── Allow only burn/redemption                                    │
+│                                                                    │
+│  Pause redemption (EXTREME LAST RESORT):                           │
+│  ├── Only during active exploit                                    │
+│  ├── Queue-based processing                                        │
+│  └── Must resume within 72hr or global settlement                  │
+│                                                                    │
+│  Governance recovery mode:                                         │
+│  ├── Emergency voting                                              │
+│  ├── Parameter changes                                             │
+│  └── Potential global settlement                                   │
+│                                                                    │
+└────────────────────────────────────────────────────────────────────┘
+
+====================================================================
+MECHANICS FLOW (NORMAL CONDITIONS)
+====================================================================
+
+          MARKET DATA FEEDS
+          |
+          |  ┌── DEX prices
+          |  ├── CEX prices
+          |  ├── Oracle prices
+          |  └── TWAP (24h)
+          |
+          v
++------------------------+
+| ORACLE + DEX TWAP      |
+| price + deviation      |
+|                        |
+| current_price = median |
+| deviation = |price-$1| |
++-----------+------------+
+            |
+            v
++------------------------+
+| PEG CONTROLLER         |
+| chooses policy actions |
+|                        |
+| Input: price, deviation|
+| Output: policy params  |
++-----------+------------+
+            |
++-----------+------------+---------------------------+
+|                        |                           |
+v                        v                           v
+[ token < $1 ]     [ token ~ $1 ]            [ token > $1 ]
+(DEPEG DOWN)       (STABLE)                  (DEPEG UP)
+|                        |                           |
+v                        v                           v
+┌───────────────┐  ┌───────────────┐      ┌───────────────┐
+│ ACTIONS:      │  │ ACTIONS:      │      │ ACTIONS:      │
+│               │  │               │      │               │
+│ - Incentivize │  │ - Normal ops  │      │ - Incentivize │
+│   burn/redeem │  │ - Maintain    │      │   mint        │
+│               │  │   liquidity   │      │               │
+│ - Increase    │  │ - Small       │      │ - Increase    │
+│   redemption  │  │   rebalances  │      │   mint cap*   │
+│   incentives  │  │               │      │               │
+│               │  │               │      │ - Sell into   │
+│ - Deploy POL  │  │               │      │   market      │
+│   to pools    │  │               │      │               │
+└───────────────┘  └───────────────┘      └───────────────┘
+
+*Only if reserves + PoR are healthy
+
+====================================================================
+DEPEG RESPONSE (AUTOMATED PLAYBOOK)
+====================================================================
+
+TRIGGER: price deviation > X% for Y minutes
+
+┌──────────────────────────────────────────────────────────────────┐
+│ STAGE 1: YELLOW ALERT (deviation 1-2%)                           │
+├──────────────────────────────────────────────────────────────────┤
+│ □ Log alert event                                                │
+│ □ Increase monitoring frequency (1min intervals)                 │
+│ □ Notify treasury ops team                                       │
+│ □ Pre-stage Tier1 liquidity                                      │
+└──────────────────────────────────────────────────────────────────┘
+              │
+              ▼
+┌──────────────────────────────────────────────────────────────────┐
+│ STAGE 2: ORANGE ALERT (deviation 2-5%)                           │
+├──────────────────────────────────────────────────────────────────┤
+│ □ Tighten mint caps by 50%                                       │
+│ □ Increase burn/redeem incentives (fee rebates)                  │
+│ □ Deploy treasury liquidity to DEX pools                         │
+│ □ Activate market maker support agreements                       │
+│ □ Alert governance watchers                                      │
+└──────────────────────────────────────────────────────────────────┘
+              │
+              ▼
+┌──────────────────────────────────────────────────────────────────┐
+│ STAGE 3: RED ALERT (deviation > 5%)                              │
+├──────────────────────────────────────────────────────────────────┤
+│ □ Pause all minting                                              │
+│ □ Raise collateral requirement                                   │
+│ □ Full treasury liquidity deployment                             │
+│ □ Guardian review initiated                                      │
+│ □ Public communication prepared                                  │
+└──────────────────────────────────────────────────────────────────┘
+              │
+              ▼
+┌──────────────────────────────────────────────────────────────────┐
+│ STAGE 4: BLACK ALERT (oracle failure / exploit suspected)        │
+├──────────────────────────────────────────────────────────────────┤
+│ □ EMERGENCY PAUSE all operations                                 │
+│ □ Freeze treasury                                                │
+│ □ Incident response team activated                               │
+│ □ Root cause analysis                                            │
+│ □ Governance recovery mode                                       │
+└──────────────────────────────────────────────────────────────────┘
+
+====================================================================
+CORE PEG INVARIANTS
+====================================================================
+
+INV-PEG-1: Mint requires Proof-of-Reserve OK
+           mint() reverts if backing < required_backing
+
+INV-PEG-2: Redemption honored from liquid tiers
+           redeem() always succeeds if Tier0+Tier1 >= amount
+
+INV-PEG-3: Risk engine can throttle issuance
+           If risk_score > threshold, mint_cap reduced
+
+INV-PEG-4: Price deviation triggers automated response
+           If |price - $1| > 2% for 30min, playbook activates
+
+INV-PEG-5: No manual peg manipulation
+           All stabilization actions are policy-gated + logged
+
+====================================================================
+PEG CONTROLLER PARAMETERS
+====================================================================
+
+  Parameter                | Default  | Range    | Governance
+  -------------------------+----------+----------+------------
+  target_price             | $1.00    | Fixed    | No
+  acceptable_deviation     | 0.5%     | 0.1-2%   | Yes
+  alert_threshold_yellow   | 1%       | 0.5-2%   | Yes
+  alert_threshold_orange   | 2%       | 1-5%     | Yes
+  alert_threshold_red      | 5%       | 2-10%    | Yes
+  mint_fee_base            | 0.1%     | 0-1%     | Yes
+  burn_fee_base            | 0.1%     | 0-1%     | Yes
+  depeg_surcharge          | 0.5%     | 0-2%     | Yes
+  cooldown_period          | 30min    | 15m-2hr  | Yes
+
+====================================================================
+ARBITRAGE ECONOMICS
+====================================================================
+
+DEPEG DOWN ($0.98 market price):
+─────────────────────────────────────────────────────────────────────
+  Arbitrageur action:
+  1. Buy 1000 tokens at $0.98 = spend $980
+  2. Redeem for $1000 reserves (minus 0.1% fee)
+  3. Receive $999 reserves
+  4. Profit = $999 - $980 = $19 (1.94% return)
+
+  Result: Buying pressure → price rises toward $1.00
+
+DEPEG UP ($1.02 market price):
+─────────────────────────────────────────────────────────────────────
+  Arbitrageur action:
+  1. Mint 1000 tokens for $1000 collateral (minus 0.1% fee)
+  2. Receive 999 tokens
+  3. Sell at $1.02 = receive $1019
+  4. Profit = $1019 - $1000 = $19 (1.9% return)
+
+  Result: Selling pressure → price falls toward $1.00
+
+====================================================================
+INTEGRATION POINTS
+====================================================================
+
+→ OracleAggregator   : Price feeds for deviation calculation
+→ SecureMintPolicy   : Mint gating based on peg status
+→ TreasuryEngine     : Liquidity deployment
+→ RiskEngine         : Risk score affects mint caps
+→ GovernanceEngine   : Parameter changes
+→ EmergencyEngine    : Pause controls
+
+====================================================================
+END STABLECOIN PEG STABILITY MECHANICS
+====================================================================

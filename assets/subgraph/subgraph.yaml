@@ -1,0 +1,231 @@
+specVersion: 0.0.5
+schema:
+  file: ./schema.graphql
+dataSources:
+  # ═══════════════════════════════════════════════════════════════════════════
+  # BACKED TOKEN
+  # ═══════════════════════════════════════════════════════════════════════════
+  - kind: ethereum/contract
+    name: BackedToken
+    network: mainnet
+    source:
+      address: "0x0000000000000000000000000000000000000000" # Replace with deployed address
+      abi: BackedToken
+      startBlock: 0 # Replace with deployment block
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - Token
+        - Holder
+        - Mint
+        - Burn
+        - Transfer
+        - DailyStats
+      abis:
+        - name: BackedToken
+          file: ./abis/BackedToken.json
+      eventHandlers:
+        - event: SecureMint(indexed address,uint256,uint256)
+          handler: handleSecureMint
+        - event: Transfer(indexed address,indexed address,uint256)
+          handler: handleTransfer
+        - event: GuardianChanged(indexed address,indexed address)
+          handler: handleGuardianChanged
+        - event: Paused(address)
+          handler: handlePaused
+        - event: Unpaused(address)
+          handler: handleUnpaused
+      file: ./src/backed-token.ts
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # SECURE MINT POLICY
+  # ═══════════════════════════════════════════════════════════════════════════
+  - kind: ethereum/contract
+    name: SecureMintPolicy
+    network: mainnet
+    source:
+      address: "0x0000000000000000000000000000000000000000" # Replace with deployed address
+      abi: SecureMintPolicy
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - Mint
+        - Token
+        - Oracle
+        - DailyStats
+      abis:
+        - name: SecureMintPolicy
+          file: ./abis/SecureMintPolicy.json
+        - name: BackedToken
+          file: ./abis/BackedToken.json
+        - name: BackingOraclePoR
+          file: ./abis/BackingOraclePoR.json
+      eventHandlers:
+        - event: SecureMintExecuted(indexed address,uint256,uint256,uint256,uint256)
+          handler: handleSecureMintExecuted
+        - event: EpochReset(uint256,uint256)
+          handler: handleEpochReset
+        - event: Paused(address)
+          handler: handlePolicyPaused
+        - event: Unpaused(address)
+          handler: handlePolicyUnpaused
+      file: ./src/secure-mint-policy.ts
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # BACKING ORACLE
+  # ═══════════════════════════════════════════════════════════════════════════
+  - kind: ethereum/contract
+    name: BackingOraclePoR
+    network: mainnet
+    source:
+      address: "0x0000000000000000000000000000000000000000" # Replace with deployed address
+      abi: BackingOraclePoR
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - Oracle
+        - Attestation
+        - OracleHealthChange
+      abis:
+        - name: BackingOraclePoR
+          file: ./abis/BackingOraclePoR.json
+      eventHandlers:
+        - event: AttestationSubmitted(indexed address,uint256,bytes32,uint256)
+          handler: handleAttestationSubmitted
+        - event: ConsensusReached(uint256,uint256)
+          handler: handleConsensusReached
+        - event: HealthStatusChanged(bool,bool,string)
+          handler: handleHealthStatusChanged
+      file: ./src/backing-oracle.ts
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # TREASURY VAULT
+  # ═══════════════════════════════════════════════════════════════════════════
+  - kind: ethereum/contract
+    name: TreasuryVault
+    network: mainnet
+    source:
+      address: "0x0000000000000000000000000000000000000000" # Replace with deployed address
+      abi: TreasuryVault
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - Treasury
+        - TreasuryDeposit
+        - TreasuryWithdrawal
+        - TreasuryRebalance
+      abis:
+        - name: TreasuryVault
+          file: ./abis/TreasuryVault.json
+      eventHandlers:
+        - event: Deposit(indexed address,uint256,uint8)
+          handler: handleDeposit
+        - event: Withdrawal(indexed address,uint256,uint8,string)
+          handler: handleWithdrawal
+        - event: TierTransfer(uint8,uint8,uint256)
+          handler: handleTierTransfer
+        - event: Rebalanced(uint256[4],uint256[4])
+          handler: handleRebalanced
+        - event: AllocationProposed(uint256[4],uint256)
+          handler: handleAllocationProposed
+        - event: AllocationExecuted(uint256[4])
+          handler: handleAllocationExecuted
+      file: ./src/treasury-vault.ts
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # REDEMPTION ENGINE
+  # ═══════════════════════════════════════════════════════════════════════════
+  - kind: ethereum/contract
+    name: RedemptionEngine
+    network: mainnet
+    source:
+      address: "0x0000000000000000000000000000000000000000" # Replace with deployed address
+      abi: RedemptionEngine
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - RedemptionRequest
+        - DailyRedemptionStats
+        - Holder
+      abis:
+        - name: RedemptionEngine
+          file: ./abis/RedemptionEngine.json
+      eventHandlers:
+        - event: RedemptionRequested(indexed address,uint256,uint256)
+          handler: handleRedemptionRequested
+        - event: RedemptionExecuted(indexed address,uint256,uint256)
+          handler: handleRedemptionExecuted
+        - event: RedemptionCancelled(indexed address,uint256)
+          handler: handleRedemptionCancelled
+      file: ./src/redemption-engine.ts
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # EMERGENCY PAUSE
+  # ═══════════════════════════════════════════════════════════════════════════
+  - kind: ethereum/contract
+    name: EmergencyPause
+    network: mainnet
+    source:
+      address: "0x0000000000000000000000000000000000000000" # Replace with deployed address
+      abi: EmergencyPause
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - EmergencyState
+        - AlertLevelChange
+      abis:
+        - name: EmergencyPause
+          file: ./abis/EmergencyPause.json
+      eventHandlers:
+        - event: AlertLevelChanged(uint8,uint8,indexed address,string)
+          handler: handleAlertLevelChanged
+      file: ./src/emergency-pause.ts
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # GOVERNOR
+  # ═══════════════════════════════════════════════════════════════════════════
+  - kind: ethereum/contract
+    name: SecureMintGovernor
+    network: mainnet
+    source:
+      address: "0x0000000000000000000000000000000000000000" # Replace with deployed address
+      abi: SecureMintGovernor
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - GovernanceProposal
+      abis:
+        - name: SecureMintGovernor
+          file: ./abis/SecureMintGovernor.json
+      eventHandlers:
+        - event: ProposalCreated(uint256,address,address[],uint256[],string[],bytes[],uint256,uint256,string)
+          handler: handleProposalCreated
+        - event: ProposalExecuted(uint256)
+          handler: handleProposalExecuted
+        - event: ProposalCanceled(uint256)
+          handler: handleProposalCanceled
+        - event: VoteCast(indexed address,uint256,uint8,uint256,string)
+          handler: handleVoteCast
+        - event: ProposalVetoed(indexed uint256,indexed address)
+          handler: handleProposalVetoed
+      file: ./src/governor.ts

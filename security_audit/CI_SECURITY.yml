@@ -1,0 +1,392 @@
+# SecureMint Engine - Security CI Pipeline
+# This workflow BLOCKS merges on security issues
+
+name: Security Analysis
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  schedule:
+    - cron: '0 6 * * *' # Daily at 6 AM UTC
+
+env:
+  FOUNDRY_PROFILE: ci
+
+jobs:
+  # ============================================================
+  # DEPENDENCY SECURITY
+  # ============================================================
+  dependency-audit:
+    name: Dependency Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: assets
+
+      - name: Run npm audit
+        run: npm audit --audit-level=high
+        working-directory: assets
+        # NO continue-on-error - this blocks on high/critical
+
+      - name: Check for known vulnerabilities
+        uses: snyk/actions/node@master
+        continue-on-error: false
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: --severity-threshold=high
+
+  # ============================================================
+  # SECRETS SCANNING
+  # ============================================================
+  secrets-scan:
+    name: Secrets Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Full history for git secrets
+
+      - name: Check for hardcoded secrets
+        run: |
+          # Check for private key patterns (64 hex chars after 0x)
+          if grep -rE "0x[a-fA-F0-9]{64}" --include="*.ts" --include="*.js" --include="*.sol" \
+             --exclude-dir=node_modules --exclude-dir=artifacts --exclude-dir=cache .; then
+            echo "::error::Potential private key pattern detected"
+            exit 1
+          fi
+
+          # Check for hardcoded API keys
+          if grep -rE "api[_-]?key.*['\"][a-zA-Z0-9]{20,}" --include="*.ts" --include="*.js" \
+             --exclude-dir=node_modules .; then
+            echo "::error::Hardcoded API key detected"
+            exit 1
+          fi
+
+          # Check for development secrets in code
+          if grep -rE "dev(elopment)?[_-]?(secret|key|password)" --include="*.ts" --include="*.js" \
+             --exclude="*.test.ts" --exclude="*.spec.ts" --exclude-dir=node_modules .; then
+            echo "::error::Development secret pattern in production code"
+            exit 1
+          fi
+
+          echo "No hardcoded secrets detected"
+
+      - name: TruffleHog scan
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          extra_args: --only-verified
+
+  # ============================================================
+  # STATIC ANALYSIS - SOLIDITY
+  # ============================================================
+  slither:
+    name: Slither Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install Slither
+        run: pip install slither-analyzer
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Install dependencies
+        run: |
+          cd assets/contracts
+          forge install
+
+      - name: Run Slither
+        id: slither
+        run: |
+          cd assets/contracts
+          slither . \
+            --json slither-output.json \
+            --sarif slither-output.sarif \
+            --exclude-dependencies \
+            --filter-paths "test/|script/" \
+            2>&1 | tee slither-log.txt
+
+          # Check for high/critical findings
+          if grep -E "High|Critical" slither-log.txt; then
+            echo "::error::Slither found High/Critical issues"
+            exit 1
+          fi
+        # NO continue-on-error
+
+      - name: Upload Slither SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: assets/contracts/slither-output.sarif
+
+      - name: Upload Slither JSON
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: slither-results
+          path: |
+            assets/contracts/slither-output.json
+            assets/contracts/slither-log.txt
+
+  # ============================================================
+  # FOUNDRY SECURITY TESTS
+  # ============================================================
+  foundry-tests:
+    name: Foundry Security Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Install dependencies
+        run: |
+          cd assets/contracts
+          forge install
+
+      - name: Run Forge tests
+        run: |
+          cd assets/contracts
+          forge test -vvv --match-path "test/security/*"
+        # NO continue-on-error
+
+      - name: Run Fuzz tests
+        run: |
+          cd assets/contracts
+          forge test --fuzz-runs 10000 --match-contract "Fuzz"
+        # NO continue-on-error
+
+      - name: Run Invariant tests
+        run: |
+          cd assets/contracts
+          forge test \
+            --match-contract "Invariant" \
+            --fuzz-runs 1000 \
+            -vvv
+        # NO continue-on-error
+
+  # ============================================================
+  # API SECURITY TESTS
+  # ============================================================
+  api-security-tests:
+    name: API Security Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: assets
+
+      - name: Run security tests
+        run: |
+          npm test -- --testPathPattern="security" --coverage
+        working-directory: assets
+        env:
+          JWT_SECRET: test-secret-minimum-32-characters-long
+          NODE_ENV: test
+
+      - name: Check coverage threshold
+        run: |
+          COVERAGE=$(cat coverage/coverage-summary.json | jq '.total.lines.pct')
+          if (( $(echo "$COVERAGE < 80" | bc -l) )); then
+            echo "::error::Coverage below 80%: $COVERAGE%"
+            exit 1
+          fi
+        working-directory: assets
+
+  # ============================================================
+  # ESLINT SECURITY RULES
+  # ============================================================
+  eslint-security:
+    name: ESLint Security
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: assets
+
+      - name: Run ESLint with security rules
+        run: |
+          npm run lint -- \
+            --plugin security \
+            --rule "security/detect-object-injection: error" \
+            --rule "security/detect-non-literal-regexp: error" \
+            --rule "security/detect-unsafe-regex: error" \
+            --rule "security/detect-buffer-noassert: error" \
+            --rule "security/detect-child-process: error" \
+            --rule "security/detect-disable-mustache-escape: error" \
+            --rule "security/detect-eval-with-expression: error" \
+            --rule "security/detect-new-buffer: error" \
+            --rule "security/detect-no-csrf-before-method-override: error" \
+            --rule "security/detect-possible-timing-attacks: error" \
+            --rule "security/detect-pseudoRandomBytes: error"
+        working-directory: assets
+
+  # ============================================================
+  # BACKTEST ENGINE - INVARIANT SIMULATION
+  # ============================================================
+  backtest:
+    name: Backtest Invariants
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: assets
+
+      - name: Compile TypeScript
+        run: npx tsc --noEmit
+        working-directory: assets
+
+      - name: Run Backtest Engine (Baseline)
+        run: |
+          npx ts-node scripts/backtest/backtest-engine.ts 2024-01-01 2024-03-31
+        working-directory: assets
+        env:
+          NODE_ENV: test
+        # NO continue-on-error - backtest failures block deployment
+
+      - name: Upload Backtest Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backtest-results
+          path: |
+            security_audit/backtest_results/
+            assets/scripts/backtest/*.json
+            assets/scripts/backtest/*.md
+
+  # ============================================================
+  # REGRESSION TESTS
+  # ============================================================
+  regression-tests:
+    name: Security Regression Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: assets
+
+      - name: Run Regression Tests
+        run: |
+          npm test -- --testPathPattern="REGRESSION_TESTS" --coverage
+        working-directory: assets
+        env:
+          JWT_SECRET: test-secret-minimum-32-characters-long
+          NODE_ENV: test
+          REDIS_HOST: localhost
+        # NO continue-on-error
+
+  # ============================================================
+  # FINAL SECURITY GATE
+  # ============================================================
+  security-gate:
+    name: Security Gate
+    needs:
+      - dependency-audit
+      - secrets-scan
+      - slither
+      - foundry-tests
+      - api-security-tests
+      - eslint-security
+      - backtest
+      - regression-tests
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Check all security jobs passed
+        run: |
+          if [ "${{ needs.dependency-audit.result }}" != "success" ]; then
+            echo "::error::Dependency audit failed"
+            exit 1
+          fi
+          if [ "${{ needs.secrets-scan.result }}" != "success" ]; then
+            echo "::error::Secrets scan failed"
+            exit 1
+          fi
+          if [ "${{ needs.slither.result }}" != "success" ]; then
+            echo "::error::Slither analysis failed"
+            exit 1
+          fi
+          if [ "${{ needs.foundry-tests.result }}" != "success" ]; then
+            echo "::error::Foundry security tests failed"
+            exit 1
+          fi
+          if [ "${{ needs.api-security-tests.result }}" != "success" ]; then
+            echo "::error::API security tests failed"
+            exit 1
+          fi
+          if [ "${{ needs.eslint-security.result }}" != "success" ]; then
+            echo "::error::ESLint security failed"
+            exit 1
+          fi
+          if [ "${{ needs.backtest.result }}" != "success" ]; then
+            echo "::error::Backtest invariant simulation failed"
+            exit 1
+          fi
+          if [ "${{ needs.regression-tests.result }}" != "success" ]; then
+            echo "::error::Security regression tests failed"
+            exit 1
+          fi
+          echo "All security checks passed!"
+
+      - name: Update PR status
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: context.sha,
+              state: 'success',
+              context: 'Security Gate',
+              description: 'All security checks passed'
+            })

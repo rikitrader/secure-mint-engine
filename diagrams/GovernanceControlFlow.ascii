@@ -1,0 +1,288 @@
+====================================================================
+                    GOVERNANCE CONTROL FLOW
+====================================================================
+
+PURPOSE: DAO-based protocol governance with timelocked execution
+INTEGRATION: All protocol engines, parameter changes, emergency controls
+
+====================================================================
+GOVERNANCE HIERARCHY
+====================================================================
+
+                  ┌─────────────────────────┐
+                  │    TOKEN HOLDERS / DAO  │
+                  │    (Ultimate Authority) │
+                  └───────────┬─────────────┘
+                              │
+                              │ votes
+                              │
+                  ┌───────────▼─────────────┐
+                  │   GOVERNANCE CONTRACT   │
+                  │   (On-Chain Voting)     │
+                  └───────────┬─────────────┘
+                              │
+                              │ queues
+                              │
+                  ┌───────────▼─────────────┐
+                  │   TIMELOCK CONTRACT     │
+                  │   (Execution Delay)     │
+                  └───────────┬─────────────┘
+                              │
+                              │ executes
+                              │
+    ┌─────────────────────────┼─────────────────────────┐
+    │                         │                         │
+    ▼                         ▼                         ▼
+┌────────────┐         ┌────────────┐         ┌────────────┐
+│ MINT       │         │ ORACLE     │         │ TREASURY   │
+│ POLICY     │         │ CONFIG     │         │ ALLOCATION │
+└────────────┘         └────────────┘         └────────────┘
+
+====================================================================
+PROPOSAL LIFECYCLE
+====================================================================
+
+                  TOKEN HOLDERS / DAO
+                            │
+                            v
+                   +-------------------+
+                   | PROPOSAL CREATED  |
+                   |                   |
+                   | Requirements:     |
+                   | - Min tokens held |
+                   | - Valid target    |
+                   | - Valid calldata  |
+                   +---------+---------+
+                             │
+                             v
+                   +-------------------+
+                   | DISCUSSION PERIOD |
+                   |                   |
+                   | Duration: 2 days  |
+                   | - Forum debate    |
+                   | - Risk analysis   |
+                   | - Community input |
+                   +---------+---------+
+                             │
+                             v
+                   +-------------------+
+                   | ON-CHAIN VOTING   |
+                   |                   |
+                   | Duration: 3 days  |
+                   | Quorum: 4% supply |
+                   | Pass: >50% FOR    |
+                   +---------+---------+
+                             │
+                  PASSES? ---+--- FAIL → ARCHIVE
+                             │         (proposal rejected)
+                             │
+                             v
+                   +----------------------+
+                   | TIMELOCK CONTRACT    |
+                   | (delay execution)    |
+                   |                      |
+                   | Delays by category:  |
+                   | - Standard: 48hr     |
+                   | - Critical: 72hr     |
+                   | - Emergency: 24hr*   |
+                   |                      |
+                   | *requires guardian   |
+                   +----------+-----------+
+                              │
+                              v
+                   +----------------------+
+                   | EXECUTION MODULE     |
+                   | (policy changes)     |
+                   |                      |
+                   | Validates:           |
+                   | - Timelock expired   |
+                   | - Proposal not       |
+                   |   cancelled          |
+                   | - Valid signature    |
+                   +----------+-----------+
+                              │
+                              v
+                    PROTOCOL PARAMETERS UPDATED
+                    (changes take effect)
+
+====================================================================
+GOVERNANCE CONTROLS (What Can Be Changed)
+====================================================================
+
+MINT POLICY PARAMETERS
+─────────────────────────────────────────────────────────────────────
+  Parameter              | Timelock | Approval Threshold
+  -----------------------+----------+-------------------
+  Global Supply Cap      | 72hr     | 60% + quorum
+  Epoch Mint Cap         | 48hr     | 50% + quorum
+  Rate Limits            | 48hr     | 50% + quorum
+  Collateral Factor      | 48hr     | 50% + quorum
+
+ORACLE CONFIGURATION
+─────────────────────────────────────────────────────────────────────
+  Parameter              | Timelock | Approval Threshold
+  -----------------------+----------+-------------------
+  Add New Oracle Source  | 72hr     | 60% + quorum
+  Remove Oracle Source   | 48hr     | 50% + quorum
+  Staleness Threshold    | 48hr     | 50% + quorum
+  Deviation Bounds       | 48hr     | 50% + quorum
+
+TREASURY ALLOCATION
+─────────────────────────────────────────────────────────────────────
+  Parameter              | Timelock | Approval Threshold
+  -----------------------+----------+-------------------
+  Add Protocol to White  | 48hr     | 50% + quorum
+  Remove from Whitelist  | 24hr     | 40% + quorum
+  Tier Allocation %      | 48hr     | 50% + quorum
+  Yield Distribution %   | 48hr     | 50% + quorum
+
+EMERGENCY CONTROLS
+─────────────────────────────────────────────────────────────────────
+  Parameter              | Timelock | Approval Threshold
+  -----------------------+----------+-------------------
+  Emergency Pause        | 0hr*     | Guardian 2-of-3
+  Resume Operations      | 24hr     | 50% + quorum
+  Add Guardian           | 72hr     | 60% + quorum
+  Remove Guardian        | 48hr     | 50% + quorum
+
+  *Guardian actions are immediate but can be vetoed by DAO
+
+RISK PARAMETERS
+─────────────────────────────────────────────────────────────────────
+  Parameter              | Timelock | Approval Threshold
+  -----------------------+----------+-------------------
+  Risk Weight Adjustment | 48hr     | 50% + quorum
+  Threshold Calibration  | 48hr     | 50% + quorum
+  Add Risk Signal        | 48hr     | 50% + quorum
+
+====================================================================
+VOTING POWER CALCULATION
+====================================================================
+
+  BASIC FORMULA:
+  voting_power = token_balance + delegated_tokens
+
+  DELEGATION:
+  - Token holders can delegate voting power
+  - Delegation is revocable at any time
+  - Delegated power does not transfer tokens
+
+  SNAPSHOT:
+  - Voting power snapshot at proposal creation
+  - Prevents flash loan governance attacks
+
+====================================================================
+PROPOSAL TYPES
+====================================================================
+
+TYPE 1: STANDARD PROPOSAL
+─────────────────────────────────────────────────────────────────────
+  Discussion: 2 days
+  Voting: 3 days
+  Timelock: 48 hours
+  Quorum: 4%
+  Use: Routine parameter changes
+
+TYPE 2: CRITICAL PROPOSAL
+─────────────────────────────────────────────────────────────────────
+  Discussion: 3 days
+  Voting: 5 days
+  Timelock: 72 hours
+  Quorum: 10%
+  Use: Major protocol changes, upgrades
+
+TYPE 3: EMERGENCY PROPOSAL
+─────────────────────────────────────────────────────────────────────
+  Discussion: 0 days
+  Voting: 1 day
+  Timelock: 24 hours
+  Quorum: 15%
+  Use: Security incidents, urgent fixes
+  Note: Must be initiated by Guardian
+
+====================================================================
+GUARDIAN MULTISIG
+====================================================================
+
+  COMPOSITION:
+  - 5 signers total
+  - 3-of-5 threshold for standard actions
+  - 2-of-5 threshold for emergency pause only
+
+  GUARDIAN POWERS:
+  ✓ Emergency pause (immediate)
+  ✓ Initiate emergency proposals
+  ✓ Veto malicious proposals (within timelock)
+  ✗ Cannot change parameters directly
+  ✗ Cannot mint tokens
+  ✗ Cannot access treasury
+
+  GUARDIAN ACCOUNTABILITY:
+  - Public identities (optional: KYC'd)
+  - Regular rotation (annual)
+  - DAO can remove with 60% vote
+
+====================================================================
+VETO MECHANISM
+====================================================================
+
+  PURPOSE: Protect against malicious governance attacks
+
+  VETO WINDOW:
+  - During timelock period
+  - Before execution
+
+  VETO AUTHORITIES:
+  1. Guardian multisig (3-of-5)
+  2. Security council (if exists)
+  3. Token holders (>25% against)
+
+  VETO OUTCOME:
+  - Proposal cancelled
+  - Cannot be re-submitted for 7 days
+  - Event logged for transparency
+
+====================================================================
+ON-CHAIN EVENTS
+====================================================================
+
+  event ProposalCreated(
+      uint256 proposalId,
+      address proposer,
+      address[] targets,
+      bytes[] calldatas,
+      string description
+  );
+
+  event VoteCast(
+      address voter,
+      uint256 proposalId,
+      uint8 support,    // 0=against, 1=for, 2=abstain
+      uint256 weight
+  );
+
+  event ProposalExecuted(uint256 proposalId);
+  event ProposalCancelled(uint256 proposalId);
+  event ProposalVetoed(uint256 proposalId, address vetoer);
+
+====================================================================
+GOVERNANCE SECURITY
+====================================================================
+
+  ATTACK VECTORS MITIGATED:
+  ├── Flash loan attacks → Snapshot at proposal creation
+  ├── Governance capture → High quorum + timelock
+  ├── Malicious proposals → Guardian veto
+  ├── Rushed decisions → Discussion + voting periods
+  └── Centralization → Token distribution requirements
+
+  BEST PRACTICES:
+  ├── Gradual decentralization
+  ├── Clear documentation
+  ├── Regular security reviews
+  ├── Community engagement
+  └── Transparent communication
+
+====================================================================
+END GOVERNANCE CONTROL FLOW
+====================================================================

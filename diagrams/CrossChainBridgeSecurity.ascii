@@ -1,0 +1,293 @@
+====================================================================
+              CROSS-CHAIN BRIDGE SECURITY MODEL
+====================================================================
+
+GOAL:
+- Move value across chains without "infinite mint" risk
+- Prevent compromised validator set from draining reserves
+- Prefer lock-and-mint + proof verification with strict limits
+
+====================================================================
+BRIDGE MODES (Ranked by Safety)
+====================================================================
+
+  Rank | Mode                        | Security Level | Trust Model
+  -----+-----------------------------+----------------+-------------
+   1   | Light-Client / Proof-Verified| BEST          | Trustless
+   2   | ZK / Validity Proofs         | VERY STRONG   | Math-only
+   3   | Optimistic + Challenge Window| OK            | Economic
+   4   | Multisig / Validator Signers | RISKIEST      | Trust n-of-m
+
+====================================================================
+LIGHT-CLIENT BRIDGE (RECOMMENDED)
+====================================================================
+
+  Security: Cryptographic proof verification
+  Trust: Chain A's consensus only
+  Attack Surface: Light client bugs, finality assumptions
+
+  HOW IT WORKS:
+  ├── Source chain state root submitted to destination
+  ├── Merkle proof verifies lock transaction
+  ├── No external validators needed
+  └── Security = source chain security
+
+====================================================================
+ZK / VALIDITY PROOF BRIDGE
+====================================================================
+
+  Security: Zero-knowledge proof verification
+  Trust: Math only (cryptographic soundness)
+  Attack Surface: Circuit bugs, trusted setup (if applicable)
+
+  HOW IT WORKS:
+  ├── Prover generates ZK proof of source chain state
+  ├── Destination verifier checks proof
+  ├── If valid, mint allowed
+  └── No trusted parties in verification
+
+====================================================================
+OPTIMISTIC BRIDGE
+====================================================================
+
+  Security: Economic + challenge window
+  Trust: At least 1 honest watcher
+  Attack Surface: Watcher collusion, challenge period attacks
+
+  HOW IT WORKS:
+  ├── Relayer submits claim "tokens locked on Chain A"
+  ├── Challenge window opens (e.g., 7 days)
+  ├── Anyone can dispute with fraud proof
+  └── If undisputed, mint proceeds
+
+====================================================================
+MULTISIG BRIDGE (USE WITH EXTREME CAUTION)
+====================================================================
+
+  Security: n-of-m signature threshold
+  Trust: Trust the validator set
+  Attack Surface: Key compromise, collusion, social engineering
+
+  HOW IT WORKS:
+  ├── Validators observe lock on Chain A
+  ├── n-of-m sign attestation
+  ├── Destination contract verifies signatures
+  └── Mint proceeds if threshold met
+
+  RISKS:
+  ├── Single point of failure if keys compromised
+  ├── Collusion can drain all locked assets
+  └── Historical exploits: >$2B stolen from multisig bridges
+
+====================================================================
+REFERENCE ARCHITECTURE (LOCK + MINT)
+====================================================================
+
+   CHAIN A (SOURCE)                           CHAIN B (DESTINATION)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+USER
+ |
+ v
++---------------------+
+| BRIDGE VAULT (LOCK) |
+| lock(token, amount) |
+|                     |
+| - Escrow funds      |
+| - Emit LockEvent    |
+| - Record nonce      |
++----------+----------+
+           |
+           v
++----------------------------+
+| MESSAGE / PROOF GENERATION |
+| tx proof / state proof     |
+|                            |
+| Contains:                  |
+| - Lock tx hash             |
+| - Amount                   |
+| - Recipient                |
+| - Source block             |
+| - Merkle proof             |
++-----------+----------------+
+            |
+            v
++----------------------------+        +---------------------------+
+| RELAYER NETWORK (untrusted)|  --->  | VERIFIER CONTRACT         |
+|                            |        |                           |
+| Relayers cannot:           |        | - Light client header     |
+| - Forge proofs             |        | - OR ZK verifier          |
+| - Modify messages          |        | - OR optimistic verifier  |
+| - Steal funds              |        +------------+--------------+
++-----------+----------------+                     |
+                                                   v
+                                      +-----------------------+
+                                      | PROOF VALIDATION      |
+                                      |                       |
+                                      | Checks:               |
+                                      | - Proof valid         |
+                                      | - Not replayed        |
+                                      | - Amount within caps  |
+                                      | - Rate limit OK       |
+                                      +------------+----------+
+                                                   |
+                                      VALID? ──────+──── INVALID
+                                         │              │
+                                         v              v
+                               +-------------------+  REJECT
+                               | BRIDGE MINT MODULE|
+                               | mintWrapped(to,amt)|
+                               +---------+---------+
+                                         |
+                                         v
+                                      USER ON CHAIN B
+
+====================================================================
+CRITICAL SECURITY CONTROLS
+====================================================================
+
+PER-CHAIN MINT CAPS
+─────────────────────────────────────────────────────────────────────
+  - Daily cap: max tokens mintable per day per chain
+  - Hourly cap: burst protection
+  - Per-tx cap: max single transaction
+  - Total cap: global supply limit across all chains
+
+RATE LIMITS
+─────────────────────────────────────────────────────────────────────
+  - Per address rate limit
+  - Per route rate limit (Chain A → Chain B)
+  - Cooldown periods after large transfers
+  - Graduated limits based on risk score
+
+PROOF FRESHNESS
+─────────────────────────────────────────────────────────────────────
+  - Block age check (proof must be recent)
+  - Finality confirmation (wait for finality)
+  - Reorg protection (sufficient confirmations)
+
+REPLAY PROTECTION
+─────────────────────────────────────────────────────────────────────
+  - Unique nonce per message
+  - Message ID tracking
+  - Nullifier for spent messages
+
+EMERGENCY CONTROLS
+─────────────────────────────────────────────────────────────────────
+  - Emergency pause per route
+  - Emergency pause global
+  - Circuit breaker on anomaly detection
+  - Guardian override capability
+
+MONITORING
+─────────────────────────────────────────────────────────────────────
+  - Real-time balance tracking
+  - Anomaly detection (unusual patterns)
+  - Validator quorum monitoring
+  - Unified incident log
+
+====================================================================
+"FOLLOW THE MONEY" INVARIANTS
+====================================================================
+
+┌────────────────────────────────────────────────────────────────────┐
+│                                                                    │
+│  INVARIANT 1: SUPPLY CONSERVATION                                  │
+│  Total wrapped minted on Chain B <= Total locked on Chain A        │
+│                                                                    │
+│  At all times:                                                     │
+│  Σ(minted[chain_i]) <= Σ(locked[source_chains])                   │
+│                                                                    │
+├────────────────────────────────────────────────────────────────────┤
+│                                                                    │
+│  INVARIANT 2: PROOF SYSTEM FAIL-SAFE                               │
+│  If proof system fails → minting stops automatically               │
+│                                                                    │
+│  Conditions that trigger stop:                                     │
+│  - Light client desync                                             │
+│  - ZK proof verification failure                                   │
+│  - Optimistic challenge successful                                 │
+│  - Validator quorum drop                                           │
+│                                                                    │
+├────────────────────────────────────────────────────────────────────┤
+│                                                                    │
+│  INVARIANT 3: GOVERNANCE TIMELOCK                                  │
+│  Governance changes must pass timelock + quorum                    │
+│                                                                    │
+│  No instant changes to:                                            │
+│  - Validator set                                                   │
+│  - Proof verification logic                                        │
+│  - Rate limits                                                     │
+│  - Emergency authorities                                           │
+│                                                                    │
+└────────────────────────────────────────────────────────────────────┘
+
+====================================================================
+BURN + UNLOCK FLOW (REVERSE DIRECTION)
+====================================================================
+
+CHAIN B (WRAPPED TOKEN)                    CHAIN A (CANONICAL TOKEN)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+USER (holds wrapped)
+ |
+ v
++---------------------+
+| BURN WRAPPED TOKEN  |
+| burn(amount)        |
++----------+----------+
+           |
+           v
++----------------------------+
+| PROOF OF BURN GENERATION   |
++-----------+----------------+
+            |
+            v
++----------------------------+
+| RELAYER → CHAIN A VERIFIER |
++-----------+----------------+
+            |
+            v
++----------------------------+
+| VAULT UNLOCK               |
+| release(user, amount)      |
++----------------------------+
+            |
+            v
+USER RECEIVES CANONICAL TOKEN
+
+====================================================================
+RECONCILIATION REQUIREMENTS
+====================================================================
+
+  DAILY RECONCILIATION:
+  ├── Sum locked on all source chains
+  ├── Sum minted on all destination chains
+  ├── Verify locked >= minted
+  └── Alert if discrepancy > 0.01%
+
+  WEEKLY AUDIT:
+  ├── Full transaction trace
+  ├── Cross-check with block explorers
+  └── Validator behavior review
+
+  MONTHLY REPORT:
+  ├── Public transparency report
+  ├── Third-party attestation
+  └── Security review summary
+
+====================================================================
+INTEGRATION WITH SECUREMINT
+====================================================================
+
+  Bridge minting uses SecureMintPolicy:
+  ├── Same oracle health checks
+  ├── Same rate limits
+  ├── Same pause controls
+  └── Additional: proof verification gate
+
+  Cross-chain = SecureMint + Bridge verification
+
+====================================================================
+END CROSS-CHAIN BRIDGE SECURITY MODEL
+====================================================================

@@ -1,0 +1,289 @@
+====================================================================
+                 EMERGENCY SHUTDOWN ARCHITECTURE
+====================================================================
+
+PURPOSE: Multi-layer emergency response system for protocol incidents
+INTEGRATION: All protocol engines, governance, oracle systems
+
+====================================================================
+TRIGGER SOURCES
+====================================================================
+
+  Source                    | Detection Method       | Severity
+  --------------------------+------------------------+----------
+  Oracle Failure            | Health check failed    | CRITICAL
+  Price Depeg > Threshold   | TWAP deviation > 5%    | HIGH
+  Exploit Detection         | Rekt/SlowMist alert    | CRITICAL
+  Liquidity Drain Event     | TVL drop > 50%/24hr    | HIGH
+  Governance Emergency Vote | DAO vote passes        | VARIABLE
+  Multisig Manual Trigger   | Guardian action        | VARIABLE
+  Reserve Shortfall         | PoR < required         | CRITICAL
+  Smart Contract Bug        | Audit/bounty report    | CRITICAL
+
+====================================================================
+EMERGENCY RESPONSE FLOW
+====================================================================
+
+  [TRIGGER DETECTED]
+          │
+          v
+  +-----------------------------+
+  |  EMERGENCY DETECTOR LOGIC   |
+  |                             |
+  | Evaluates:                  |
+  | - Trigger severity          |
+  | - Affected systems          |
+  | - Automatic vs manual       |
+  +-------------+---------------+
+                │
+                v
+  +-----------------------------+
+  | CIRCUIT BREAKER ACTIVATED   |
+  |                             |
+  | Actions taken:              |
+  | - Log incident start        |
+  | - Capture state snapshot    |
+  | - Notify all systems        |
+  +-------------+---------------+
+                │
+  +-------------+----------------+----------------------+
+  │             │                │                      │
+  v             v                v                      v
+┌──────────┐ ┌──────────┐  ┌──────────┐          ┌──────────┐
+│  Pause   │ │  Pause   │  │  Pause   │          │  Freeze  │
+│ Minting  │ │Borrowing │  │Transfers*│          │ Treasury │
+└──────────┘ └──────────┘  └──────────┘          └──────────┘
+                               │
+                (*optional policy - configurable)
+                               │
+                               v
+  +-----------------------------+
+  | FREEZE TREASURY MOVEMENTS   |
+  |                             |
+  | - Block deposits to DeFi    |
+  | - Block rebalancing         |
+  | - Hold all positions        |
+  +-------------+---------------+
+                │
+                v
+  +-----------------------------+
+  | GOVERNANCE RECOVERY MODE    |
+  |                             |
+  | - Emergency proposal path   |
+  | - Shortened voting (24hr)   |
+  | - Higher quorum (15%)       |
+  +-------------+---------------+
+                │
+                v
+  FIX ISSUE → VOTE → RESUME SYSTEM
+
+====================================================================
+SHUTDOWN LEVELS
+====================================================================
+
+LEVEL 1: PARTIAL PAUSE (Yellow Alert)
+─────────────────────────────────────────────────────────────────────
+  Trigger: Medium risk threshold crossed
+  Actions:
+    ⚠ Pause new minting
+    ✓ Allow burns/redemptions
+    ✓ Allow transfers
+    ✓ Treasury holds position
+  Authority: Automated OR Guardian 2-of-5
+  Resume: Guardian 3-of-5 OR DAO vote
+
+LEVEL 2: FULL PAUSE (Orange Alert)
+─────────────────────────────────────────────────────────────────────
+  Trigger: High risk threshold OR confirmed incident
+  Actions:
+    ✗ Pause minting
+    ✗ Pause borrowing
+    ⚠ Rate-limit redemptions
+    ✓ Allow transfers
+    ⚠ Freeze treasury movements
+  Authority: Guardian 3-of-5
+  Resume: DAO vote (50% + quorum)
+
+LEVEL 3: EMERGENCY FREEZE (Red Alert)
+─────────────────────────────────────────────────────────────────────
+  Trigger: Active exploit OR critical vulnerability
+  Actions:
+    ✗ Pause ALL minting
+    ✗ Pause ALL borrowing
+    ✗ Pause ALL transfers (optional)
+    ✗ Freeze treasury
+    ✗ Freeze governance
+  Authority: Guardian 4-of-5 OR Security Council
+  Resume: DAO vote (60% + 10% quorum)
+
+LEVEL 4: GLOBAL SETTLEMENT (Black Alert)
+─────────────────────────────────────────────────────────────────────
+  Trigger: Irrecoverable state OR protocol end-of-life
+  Actions:
+    ✗ Permanent mint disable
+    ✗ Enable proportional redemption
+    ✗ Wind down all positions
+    ✗ Distribute remaining reserves
+  Authority: DAO supermajority (75%)
+  Resume: NOT REVERSIBLE
+
+====================================================================
+FAILSAFE DESIGN
+====================================================================
+
+  ┌──────────────────────────────────────────────────────────────┐
+  │                   DEFENSE IN DEPTH                           │
+  ├──────────────────────────────────────────────────────────────┤
+  │                                                              │
+  │  FAILSAFE 1: Multisig Override                               │
+  │  └── Guardian can pause without DAO vote                     │
+  │  └── 2-of-5 for pause, 3-of-5 for resume                     │
+  │                                                              │
+  │  FAILSAFE 2: Oracle Redundancy                               │
+  │  └── Multiple oracle sources                                 │
+  │  └── Auto-pause if majority disagree                         │
+  │  └── Fallback to TWAP if primary fails                       │
+  │                                                              │
+  │  FAILSAFE 3: Kill Switch Contract                            │
+  │  └── Immutable pause function                                │
+  │  └── Cannot be disabled by governance                        │
+  │  └── Last resort for critical bugs                           │
+  │                                                              │
+  │  FAILSAFE 4: Asset Redemption Window                         │
+  │  └── Even during pause, users can redeem                     │
+  │  └── Proportional to reserves available                      │
+  │  └── Queue-based fairness                                    │
+  │                                                              │
+  │  FAILSAFE 5: On-chain Incident Log                           │
+  │  └── Immutable record of all emergency actions               │
+  │  └── Timestamped with block number                           │
+  │  └── Links to evidence snapshots                             │
+  │                                                              │
+  └──────────────────────────────────────────────────────────────┘
+
+====================================================================
+EMERGENCY RESPONSE PLAYBOOK
+====================================================================
+
+PHASE 1: DETECTION (0-5 minutes)
+─────────────────────────────────────────────────────────────────────
+  □ Automated alert triggered
+  □ Guardian notification sent
+  □ Initial severity assessment
+  □ State snapshot captured
+
+PHASE 2: CONTAINMENT (5-15 minutes)
+─────────────────────────────────────────────────────────────────────
+  □ Circuit breaker activated
+  □ Appropriate pause level engaged
+  □ Treasury movements frozen
+  □ Public communication prepared
+
+PHASE 3: ASSESSMENT (15-60 minutes)
+─────────────────────────────────────────────────────────────────────
+  □ Root cause analysis
+  □ Impact assessment (funds at risk)
+  □ Remediation options identified
+  □ Security team engaged
+
+PHASE 4: REMEDIATION (Variable)
+─────────────────────────────────────────────────────────────────────
+  □ Fix developed (if code bug)
+  □ Fix audited (if time permits)
+  □ Governance proposal created
+  □ Community informed
+
+PHASE 5: RECOVERY (Post-fix)
+─────────────────────────────────────────────────────────────────────
+  □ Fix deployed (via timelock)
+  □ Gradual resume (phased)
+  □ Enhanced monitoring
+  □ Post-mortem published
+
+====================================================================
+AUTOMATIC TRIGGER THRESHOLDS
+====================================================================
+
+  Metric                      | Yellow  | Orange  | Red
+  ----------------------------+---------+---------+--------
+  Oracle staleness            | 1 hr    | 4 hr    | 24 hr
+  Price deviation from peg    | 2%      | 5%      | 10%
+  TVL drop (24hr)             | 20%     | 40%     | 60%
+  Reserve shortfall           | 2%      | 5%      | 10%
+  Risk score                  | 50      | 70      | 90
+  Exploit alerts              | Related | Similar | Direct
+
+====================================================================
+GUARDIAN ROTATION & ACCOUNTABILITY
+====================================================================
+
+  GUARDIAN REQUIREMENTS:
+  - Verified identity (KYC optional but recommended)
+  - Security training completed
+  - Hardware wallet required
+  - 24/7 availability rotation
+
+  GUARDIAN ACTIONS LOGGED:
+  - All pause/resume calls
+  - All veto actions
+  - All emergency proposals
+  - Response times tracked
+
+  GUARDIAN REMOVAL:
+  - DAO vote (60% + quorum)
+  - Automatic if unresponsive >48hr
+  - Automatic if key compromise suspected
+
+====================================================================
+ON-CHAIN EVENTS
+====================================================================
+
+  event EmergencyPaused(
+      uint8 level,
+      address triggeredBy,
+      string reason,
+      uint256 timestamp
+  );
+
+  event EmergencyResumed(
+      uint8 previousLevel,
+      address resumedBy,
+      uint256 timestamp
+  );
+
+  event CircuitBreakerTriggered(
+      string triggerType,
+      uint256 triggerValue,
+      uint256 threshold
+  );
+
+  event GlobalSettlementInitiated(
+      uint256 proposalId,
+      uint256 totalSupply,
+      uint256 reservesAvailable
+  );
+
+====================================================================
+RECOVERY PROCEDURES
+====================================================================
+
+STANDARD RECOVERY (Level 1-2):
+─────────────────────────────────────────────────────────────────────
+  1. Guardian confirms issue resolved
+  2. Security team signs off
+  3. Guardian initiates resume (3-of-5)
+  4. 24hr observation period
+  5. Full operations restored
+
+MAJOR RECOVERY (Level 3):
+─────────────────────────────────────────────────────────────────────
+  1. Root cause publicly documented
+  2. Fix audited by third party
+  3. DAO vote to resume (60% + 10% quorum)
+  4. Timelock delay (48hr)
+  5. Phased resume (25% → 50% → 100%)
+  6. Enhanced monitoring (30 days)
+
+====================================================================
+END EMERGENCY SHUTDOWN ARCHITECTURE
+====================================================================

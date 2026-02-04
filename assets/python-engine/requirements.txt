@@ -1,0 +1,32 @@
+# SecureMint Engine - Python CLI Dependencies
+# Install with: pip install -r requirements.txt
+
+# Web3 / Blockchain
+web3>=6.0.0
+eth-account>=0.10.0
+eth-typing>=3.0.0
+
+# Async HTTP
+aiohttp>=3.9.0
+aiofiles>=23.0.0
+
+# CLI
+argparse>=1.4.0
+click>=8.0.0  # Alternative CLI framework
+
+# Data Processing
+pandas>=2.0.0
+numpy>=1.24.0
+
+# Utilities
+python-dotenv>=1.0.0
+pyyaml>=6.0.0
+
+# Type Checking (dev)
+mypy>=1.0.0
+types-aiofiles>=23.0.0
+
+# Testing (dev)
+pytest>=7.0.0
+pytest-asyncio>=0.21.0
+pytest-cov>=4.0.0

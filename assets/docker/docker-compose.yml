@@ -1,0 +1,213 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# SecureMint Engine - Docker Compose (Development)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+version: '3.8'
+
+services:
+  # ═══════════════════════════════════════════════════════════════════════════
+  # API Gateway
+  # ═══════════════════════════════════════════════════════════════════════════
+  api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.api
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      - DATABASE_URL=postgresql://securemint:securemint@postgres:5432/securemint
+      - REDIS_URL=redis://redis:6379
+      - RPC_URL=${RPC_URL:-http://hardhat:8545}
+      - JWT_SECRET=${JWT_SECRET:-dev-secret}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ../api-gateway/src:/app/src:ro
+    restart: unless-stopped
+    networks:
+      - securemint
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Dashboard
+  # ═══════════════════════════════════════════════════════════════════════════
+  dashboard:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.dashboard
+      args:
+        - NEXT_PUBLIC_API_URL=http://localhost:3000
+        - NEXT_PUBLIC_CHAIN_ID=31337
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=development
+    depends_on:
+      - api
+    restart: unless-stopped
+    networks:
+      - securemint
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # PostgreSQL Database
+  # ═══════════════════════════════════════════════════════════════════════════
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=securemint
+      - POSTGRES_PASSWORD=securemint
+      - POSTGRES_DB=securemint
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ../database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U securemint"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - securemint
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Redis Cache
+  # ═══════════════════════════════════════════════════════════════════════════
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - securemint
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Local Hardhat Node
+  # ═══════════════════════════════════════════════════════════════════════════
+  hardhat:
+    image: node:20-alpine
+    working_dir: /app
+    ports:
+      - "8545:8545"
+    volumes:
+      - ../contracts:/app
+    command: sh -c "npm install && npx hardhat node --hostname 0.0.0.0"
+    restart: unless-stopped
+    networks:
+      - securemint
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Graph Node (Subgraph)
+  # ═══════════════════════════════════════════════════════════════════════════
+  graph-node:
+    image: graphprotocol/graph-node:latest
+    ports:
+      - "8000:8000"
+      - "8001:8001"
+      - "8020:8020"
+      - "8030:8030"
+      - "8040:8040"
+    environment:
+      postgres_host: postgres
+      postgres_user: securemint
+      postgres_pass: securemint
+      postgres_db: graph
+      ipfs: 'ipfs:5001'
+      ethereum: 'mainnet:http://hardhat:8545'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ipfs:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - securemint
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # IPFS
+  # ═══════════════════════════════════════════════════════════════════════════
+  ipfs:
+    image: ipfs/kubo:latest
+    ports:
+      - "5001:5001"
+    volumes:
+      - ipfs_data:/data/ipfs
+    healthcheck:
+      test: ["CMD-SHELL", "ipfs dag stat /ipfs/QmUNLLsPACCz1vLxQVkXqqLX5R1X345qqfHbsf67hvA3Nn || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - securemint
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Prometheus
+  # ═══════════════════════════════════════════════════════════════════════════
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ../infrastructure/monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ../infrastructure/monitoring/prometheus/rules:/etc/prometheus/rules:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.enable-lifecycle'
+    restart: unless-stopped
+    networks:
+      - securemint
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Grafana
+  # ═══════════════════════════════════════════════════════════════════════════
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3002:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - ../infrastructure/monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+    networks:
+      - securemint
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# VOLUMES
+# ═══════════════════════════════════════════════════════════════════════════════
+
+volumes:
+  postgres_data:
+  redis_data:
+  ipfs_data:
+  prometheus_data:
+  grafana_data:
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# NETWORKS
+# ═══════════════════════════════════════════════════════════════════════════════
+
+networks:
+  securemint:
+    driver: bridge

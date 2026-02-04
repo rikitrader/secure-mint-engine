@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://securemint.engine/schemas/oracle-attestation.json",
+  "title": "Oracle Attestation",
+  "description": "Schema for oracle attestation data submitted by attestors",
+  "type": "object",
+  "required": ["attestor", "backing_amount", "timestamp", "proof", "signature"],
+  "properties": {
+    "attestor": {
+      "type": "string",
+      "pattern": "^0x[a-fA-F0-9]{40}$",
+      "description": "Ethereum address of the attestor"
+    },
+    "backing_amount": {
+      "type": "string",
+      "pattern": "^[0-9]+$",
+      "description": "Verified backing amount in reserve asset decimals"
+    },
+    "timestamp": {
+      "type": "integer",
+      "description": "Unix timestamp of attestation"
+    },
+    "proof": {
+      "type": "object",
+      "required": ["type", "data"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["merkle", "signature", "zk_proof", "audit_hash"]
+        },
+        "data": {
+          "type": "string",
+          "description": "Proof data (format depends on type)"
+        },
+        "source": {
+          "type": "string",
+          "description": "Source of the proof (e.g., custodian name)"
+        }
+      }
+    },
+    "signature": {
+      "type": "object",
+      "required": ["v", "r", "s"],
+      "properties": {
+        "v": {
+          "type": "integer"
+        },
+        "r": {
+          "type": "string",
+          "pattern": "^0x[a-fA-F0-9]{64}$"
+        },
+        "s": {
+          "type": "string",
+          "pattern": "^0x[a-fA-F0-9]{64}$"
+        }
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "reserve_breakdown": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "asset_type": {
+                "type": "string"
+              },
+              "amount": {
+                "type": "string"
+              },
+              "custodian": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "audit_reference": {
+          "type": "string"
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

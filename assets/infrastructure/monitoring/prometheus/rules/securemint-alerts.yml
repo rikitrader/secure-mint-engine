@@ -1,0 +1,170 @@
+# SecureMint Engine - Prometheus Alert Rules
+
+groups:
+  - name: securemint-critical
+    rules:
+      # INV-SM-1: Solvency Violation
+      - alert: SolvencyViolation
+        expr: securemint_total_supply > securemint_backing_value
+        for: 0m
+        labels:
+          severity: critical
+          team: security
+        annotations:
+          summary: "CRITICAL: Solvency invariant violated"
+          description: "Total supply ({{ $value }}) exceeds backing. INV-SM-1 VIOLATED."
+          runbook_url: "https://docs.securemint.io/runbooks/solvency"
+
+      # INV-SM-2: Rate Limit Violation
+      - alert: RateLimitViolation
+        expr: securemint_epoch_minted > securemint_epoch_capacity
+        for: 0m
+        labels:
+          severity: critical
+          team: security
+        annotations:
+          summary: "CRITICAL: Rate limit invariant violated"
+          description: "Epoch minted ({{ $value }}) exceeds capacity. INV-SM-2 VIOLATED."
+          runbook_url: "https://docs.securemint.io/runbooks/ratelimit"
+
+      # INV-SM-4: Emergency Level Active
+      - alert: EmergencyLevelActive
+        expr: securemint_emergency_level >= 3
+        for: 0m
+        labels:
+          severity: critical
+          team: oncall
+        annotations:
+          summary: "CRITICAL: Emergency level activated"
+          description: "Emergency level is {{ $value }}. Protocol operations restricted."
+          runbook_url: "https://docs.securemint.io/runbooks/emergency"
+
+  - name: securemint-high
+    rules:
+      # INV-SM-3: Oracle Staleness
+      - alert: OracleStale
+        expr: (time() - securemint_oracle_last_update) > 3600
+        for: 5m
+        labels:
+          severity: high
+          team: backend
+        annotations:
+          summary: "HIGH: Oracle data is stale"
+          description: "Oracle hasn't been updated in {{ $value | humanizeDuration }}."
+          runbook_url: "https://docs.securemint.io/runbooks/oracle"
+
+      # Near Solvency Warning
+      - alert: SolvencyWarning
+        expr: (securemint_backing_value - securemint_total_supply) / securemint_total_supply < 0.05
+        for: 5m
+        labels:
+          severity: high
+          team: treasury
+        annotations:
+          summary: "HIGH: Collateralization ratio low"
+          description: "Buffer between backing and supply is only {{ $value | humanizePercentage }}."
+
+      # High Epoch Usage
+      - alert: EpochCapacityHigh
+        expr: securemint_epoch_minted / securemint_epoch_capacity > 0.9
+        for: 5m
+        labels:
+          severity: high
+          team: operations
+        annotations:
+          summary: "HIGH: Epoch capacity nearly exhausted"
+          description: "{{ $value | humanizePercentage }} of epoch capacity used."
+
+      # Elevated Emergency Level
+      - alert: ElevatedEmergencyLevel
+        expr: securemint_emergency_level >= 1 and securemint_emergency_level < 3
+        for: 5m
+        labels:
+          severity: high
+          team: oncall
+        annotations:
+          summary: "HIGH: Elevated emergency level"
+          description: "Emergency level is {{ $value }} (elevated but not critical)."
+
+  - name: securemint-medium
+    rules:
+      # Oracle Approaching Staleness
+      - alert: OracleAgingWarning
+        expr: (time() - securemint_oracle_last_update) > 1800 and (time() - securemint_oracle_last_update) <= 3600
+        for: 5m
+        labels:
+          severity: medium
+          team: backend
+        annotations:
+          summary: "MEDIUM: Oracle data aging"
+          description: "Oracle data is {{ $value | humanizeDuration }} old, approaching staleness threshold."
+
+      # Treasury Imbalance
+      - alert: TreasuryImbalance
+        expr: |
+          abs(
+            securemint_treasury_tier_balance{tier="0"} / securemint_treasury_total_reserves - 0.1
+          ) > 0.05
+        for: 15m
+        labels:
+          severity: medium
+          team: treasury
+        annotations:
+          summary: "MEDIUM: Treasury tier imbalance"
+          description: "HOT tier allocation deviates significantly from target (10%)."
+
+      # Large Mint Transaction
+      - alert: LargeMintDetected
+        expr: increase(securemint_mint_amount_total[5m]) > securemint_epoch_capacity * 0.1
+        for: 0m
+        labels:
+          severity: medium
+          team: operations
+        annotations:
+          summary: "MEDIUM: Large mint detected"
+          description: "Mint of {{ $value }} detected (>10% of epoch capacity)."
+
+  - name: securemint-low
+    rules:
+      # Subgraph Sync Delay
+      - alert: SubgraphSyncDelay
+        expr: securemint_subgraph_blocks_behind > 100
+        for: 10m
+        labels:
+          severity: low
+          team: infrastructure
+        annotations:
+          summary: "LOW: Subgraph sync delay"
+          description: "Subgraph is {{ $value }} blocks behind."
+
+      # Dashboard High Latency
+      - alert: DashboardLatency
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="securemint-dashboard"}[5m])) > 2
+        for: 10m
+        labels:
+          severity: low
+          team: frontend
+        annotations:
+          summary: "LOW: Dashboard high latency"
+          description: "P95 latency is {{ $value | humanizeDuration }}."
+
+  - name: securemint-recording
+    rules:
+      # Pre-calculated metrics for dashboards
+      - record: securemint:collateralization_ratio
+        expr: securemint_backing_value / securemint_total_supply
+
+      - record: securemint:epoch_capacity_used_ratio
+        expr: securemint_epoch_minted / securemint_epoch_capacity
+
+      - record: securemint:oracle_age_seconds
+        expr: time() - securemint_oracle_last_update
+
+      - record: securemint:mint_rate_1h
+        expr: increase(securemint_mint_total[1h])
+
+      - record: securemint:burn_rate_1h
+        expr: increase(securemint_burn_total[1h])
+
+      - record: securemint:net_supply_change_1h
+        expr: increase(securemint_mint_total[1h]) - increase(securemint_burn_total[1h])

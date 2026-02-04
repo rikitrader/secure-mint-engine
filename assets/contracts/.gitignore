@@ -1,0 +1,60 @@
+# Compiler output
+cache/
+out/
+artifacts/
+typechain-types/
+
+# Broadcast files (deployment transactions)
+broadcast/
+!broadcast/.gitkeep
+
+# Environment
+.env
+!.env.example
+
+# Coverage
+coverage/
+lcov.info
+
+# Dependencies
+node_modules/
+lib/
+
+# Foundry cache
+forge-cache/
+
+# Build info
+build-info/
+
+# Gas snapshots
+.gas-snapshot
+
+# Slither
+slither-results/
+slither.db.json
+
+# Echidna
+crytic-export/
+echidna-corpus/
+echidna-*
+
+# Certora
+.certora_config/
+.certora_internal/
+certora_output/
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+
+# Deployment artifacts (keep structure)
+deployments/*
+!deployments/.gitkeep
+!deployments/localhost/
+
+# Temp files
+*.log
+tmp/

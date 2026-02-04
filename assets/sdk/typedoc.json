@@ -1,0 +1,40 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": ["src/index.ts"],
+  "out": "docs",
+  "name": "SecureMint SDK",
+  "readme": "README.md",
+  "theme": "default",
+  "includeVersion": true,
+  "categorizeByGroup": true,
+  "categoryOrder": [
+    "Core",
+    "Clients",
+    "React",
+    "Types",
+    "Utils",
+    "*"
+  ],
+  "excludePrivate": true,
+  "excludeProtected": false,
+  "excludeExternals": true,
+  "excludeInternal": true,
+  "excludeNotDocumented": false,
+  "plugin": ["typedoc-plugin-markdown"],
+  "sort": ["source-order"],
+  "validation": {
+    "invalidLink": true,
+    "notExported": true
+  },
+  "navigationLinks": {
+    "GitHub": "https://github.com/your-org/secure-mint-engine",
+    "NPM": "https://www.npmjs.com/package/@secure-mint/sdk"
+  },
+  "compilerOptions": {
+    "strict": true,
+    "module": "ESNext",
+    "target": "ES2022",
+    "moduleResolution": "node",
+    "esModuleInterop": true
+  }
+}

@@ -1,0 +1,212 @@
+====================================================================
+                    RISK SCORING ENGINE
+====================================================================
+
+PURPOSE: Real-time risk assessment for protocol operations
+INTEGRATION: SecureMintPolicy, LiquidityRoutingEngine, GovernanceEngine
+
+====================================================================
+INPUT SIGNALS
+====================================================================
+
+  Signal                      | Source              | Update Freq
+  ----------------------------+---------------------+-------------
+  Price Volatility Feed       | Chainlink/Pyth      | Real-time
+  Liquidity Depth Feed        | DEX Aggregators     | Per block
+  Oracle Deviation %          | Internal monitor    | Per block
+  Protocol TVL Exposure       | DeFiLlama/L2Beat    | Hourly
+  Smart Contract Audit Score  | Audit registry      | On change
+  Exploit Alerts Feed         | Rekt/SlowMist       | Real-time
+  Market Correlation Risk     | Analytics engine    | Daily
+  Collateralization Ratio     | On-chain oracle     | Per block
+  Utilization Rate            | Protocol state      | Per block
+
+====================================================================
+RISK CALCULATION FLOW
+====================================================================
+
+  [Price Volatility]──────────┐
+  [Liquidity Depth]───────────┤
+  [Oracle Deviation]──────────┤
+  [Protocol TVL]──────────────┤
+  [Audit Score]───────────────┼───────────┐
+  [Exploit Alerts]────────────┤           │
+  [Correlation Risk]──────────┤           │
+  [Collateral Ratio]──────────┤           │
+  [Utilization Rate]──────────┘           │
+                                          │
+                                          v
+                +----------------------------+
+                |   DATA NORMALIZATION       |
+                |  (scale 0-100 per metric)  |
+                |                            |
+                | Formula:                   |
+                | normalized = (raw - min)   |
+                |            / (max - min)   |
+                |            × 100           |
+                +-------------+--------------+
+                              |
+                              v
+                +----------------------------+
+                | WEIGHTED RISK CALCULATOR   |
+                |                            |
+                | Risk = Σ(metric × weight)  |
+                |                            |
+                | Weights (sum to 1.0):      |
+                | - Volatility: 0.15         |
+                | - Liquidity: 0.12          |
+                | - Oracle Dev: 0.15         |
+                | - TVL: 0.10                |
+                | - Audit: 0.12              |
+                | - Exploits: 0.15           |
+                | - Correlation: 0.06        |
+                | - Collateral: 0.10         |
+                | - Utilization: 0.05        |
+                +-------------+--------------+
+                              |
+                              v
+                +----------------------------+
+                | RISK SCORE OUTPUT (0-100)  |
+                |                            |
+                | 0 = Maximum Safety         |
+                | 100 = Maximum Risk         |
+                +-------------+--------------+
+                              |
+        +---------------------+----------------------+
+        |                     |                      |
+        v                     v                      v
+  ┌───────────┐         ┌───────────┐         ┌───────────┐
+  │  0-30     │         │  31-65    │         │  66-100   │
+  │ LOW RISK  │         │ MED RISK  │         │ HIGH RISK │
+  │  [GREEN]  │         │ [YELLOW]  │         │   [RED]   │
+  └───────────┘         └───────────┘         └───────────┘
+
+====================================================================
+AUTOMATED ACTIONS BY RISK TIER
+====================================================================
+
+LOW RISK (0-30)
+─────────────────────────────────────────────────────────────────────
+  Status: Normal operations
+  Actions:
+    ✓ Full mint capacity enabled
+    ✓ Standard collateral requirements
+    ✓ Normal rate limits
+    ✓ Standard monitoring
+
+MEDIUM RISK (31-65)
+─────────────────────────────────────────────────────────────────────
+  Status: Elevated caution
+  Actions:
+    ⚠ Rate-limit minting to 50% capacity
+    ⚠ Increase collateral factor by 10%
+    ⚠ Enhanced monitoring (5min intervals)
+    ⚠ Alert governance watchers
+    ⚠ Prepare contingency plans
+
+HIGH RISK (66-100)
+─────────────────────────────────────────────────────────────────────
+  Status: Emergency protocol
+  Actions:
+    ✗ PAUSE all minting operations
+    ✗ Trigger governance alert
+    ✗ Activate circuit breaker
+    ✗ Notify multisig guardians
+    ✗ Log evidence snapshot
+    ✗ Enable emergency redemptions only
+
+====================================================================
+METRIC SCORING DETAILS
+====================================================================
+
+PRICE VOLATILITY (Weight: 0.15)
+─────────────────────────────────────────────────────────────────────
+  Measure: 24h realized volatility
+  Low Risk: < 2% (score 0-30)
+  Med Risk: 2-5% (score 31-65)
+  High Risk: > 5% (score 66-100)
+
+LIQUIDITY DEPTH (Weight: 0.12)
+─────────────────────────────────────────────────────────────────────
+  Measure: Slippage for $1M trade
+  Low Risk: < 0.5% slippage (score 0-30)
+  Med Risk: 0.5-2% slippage (score 31-65)
+  High Risk: > 2% slippage (score 66-100)
+
+ORACLE DEVIATION (Weight: 0.15)
+─────────────────────────────────────────────────────────────────────
+  Measure: Deviation from TWAP
+  Low Risk: < 1% deviation (score 0-30)
+  Med Risk: 1-3% deviation (score 31-65)
+  High Risk: > 3% deviation (score 66-100)
+
+PROTOCOL TVL EXPOSURE (Weight: 0.10)
+─────────────────────────────────────────────────────────────────────
+  Measure: % of total protocol TVL in single pool
+  Low Risk: < 10% concentration (score 0-30)
+  Med Risk: 10-25% concentration (score 31-65)
+  High Risk: > 25% concentration (score 66-100)
+
+AUDIT SCORE (Weight: 0.12)
+─────────────────────────────────────────────────────────────────────
+  Measure: Audit quality and coverage
+  Low Risk: Multiple top-tier audits (score 0-30)
+  Med Risk: Single audit or mid-tier (score 31-65)
+  High Risk: No audit or outdated (score 66-100)
+
+EXPLOIT ALERTS (Weight: 0.15)
+─────────────────────────────────────────────────────────────────────
+  Measure: Active exploit signals
+  Low Risk: No alerts (score 0)
+  Med Risk: Related protocol exploited (score 50)
+  High Risk: Direct exploit detected (score 100)
+
+COLLATERALIZATION RATIO (Weight: 0.10)
+─────────────────────────────────────────────────────────────────────
+  Measure: Backing ratio
+  Low Risk: > 150% collateralized (score 0-30)
+  Med Risk: 100-150% collateralized (score 31-65)
+  High Risk: < 100% collateralized (score 66-100)
+
+UTILIZATION RATE (Weight: 0.05)
+─────────────────────────────────────────────────────────────────────
+  Measure: % of capacity in use
+  Low Risk: < 50% utilization (score 0-30)
+  Med Risk: 50-80% utilization (score 31-65)
+  High Risk: > 80% utilization (score 66-100)
+
+====================================================================
+RISK SCORE HISTORY & TRENDS
+====================================================================
+
+  ROLLING METRICS:
+  - 1hr moving average
+  - 24hr moving average
+  - 7d trend direction
+  - Peak score (30d)
+
+  TREND ALERTS:
+  - Rising trend (+10 pts/hr) → Early warning
+  - Spike detection (>20 pts jump) → Immediate review
+  - Sustained elevation (>50 for 4hr) → Escalation
+
+====================================================================
+INTEGRATION INTERFACE
+====================================================================
+
+function getRiskScore() external view returns (
+    uint256 score,         // 0-100
+    RiskTier tier,         // LOW, MEDIUM, HIGH
+    uint256 timestamp,
+    string[] alerts
+);
+
+function getMetricBreakdown() external view returns (
+    MetricScore[] metrics  // Individual metric scores
+);
+
+function shouldPauseMint() external view returns (bool);
+
+====================================================================
+END RISK SCORING ENGINE
+====================================================================

@@ -1,0 +1,245 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+env:
+  FOUNDRY_PROFILE: ci
+
+jobs:
+  # ═══════════════════════════════════════════════════════════════════════════
+  # SOLIDITY COMPILATION & LINTING
+  # ═══════════════════════════════════════════════════════════════════════════
+  lint:
+    name: Lint & Compile
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Solhint
+        run: npm run lint:sol
+
+      - name: Compile contracts (Foundry)
+        run: forge build --sizes
+
+      - name: Compile contracts (Hardhat)
+        run: npx hardhat compile
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # FOUNDRY TESTS
+  # ═══════════════════════════════════════════════════════════════════════════
+  foundry-tests:
+    name: Foundry Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
+
+      - name: Run Forge tests
+        run: |
+          forge test -vvv
+        env:
+          FOUNDRY_PROFILE: ci
+
+      - name: Run Forge coverage
+        run: |
+          forge coverage --report summary
+        continue-on-error: true
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # HARDHAT TESTS
+  # ═══════════════════════════════════════════════════════════════════════════
+  hardhat-tests:
+    name: Hardhat Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run unit tests
+        run: npm run test:unit
+
+      - name: Run integration tests
+        run: npm run test:integration
+
+      - name: Generate coverage report
+        run: npm run coverage
+        continue-on-error: true
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./coverage/lcov.info
+          fail_ci_if_error: false
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # INVARIANT TESTS (Foundry Fuzzing)
+  # ═══════════════════════════════════════════════════════════════════════════
+  invariant-tests:
+    name: Invariant Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
+
+      - name: Run invariant tests
+        run: |
+          forge test --match-contract Invariant -vvv
+        env:
+          FOUNDRY_FUZZ_RUNS: 10000
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # MONETARY ROUTING CI CHECK
+  # ═══════════════════════════════════════════════════════════════════════════
+  monetary-routing:
+    name: Monetary Routing Validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Python dependencies
+        run: |
+          pip install pyyaml jsonschema
+
+      - name: Run Monetary Routing CI Check
+        run: |
+          python scripts/monetary_routing_ci_check.py
+        env:
+          PROJECT_CONTEXT_PATH: intake/PROJECT_CONTEXT.json
+          ROUTING_DIAGRAM_PATH: diagrams/MonetaryRouting.ascii
+          CI_REPORT_PATH: outputs/MonetaryRoutingCIReport.md
+
+      - name: Upload CI Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: monetary-routing-report
+          path: outputs/MonetaryRoutingCIReport.md
+        if: always()
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # SECURITY ANALYSIS
+  # ═══════════════════════════════════════════════════════════════════════════
+  slither:
+    name: Slither Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Slither
+        run: pip install slither-analyzer
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Slither
+        run: slither . --config-file slither.config.json
+        continue-on-error: true
+
+      - name: Upload Slither report
+        uses: actions/upload-artifact@v4
+        with:
+          name: slither-report
+          path: slither-report.json
+        if: always()
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # GAS REPORT
+  # ═══════════════════════════════════════════════════════════════════════════
+  gas-report:
+    name: Gas Report
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
+
+      - name: Run gas snapshot
+        run: forge snapshot
+
+      - name: Compare gas snapshot
+        run: forge snapshot --check
+        continue-on-error: true
+
+      - name: Upload gas report
+        uses: actions/upload-artifact@v4
+        with:
+          name: gas-snapshot
+          path: .gas-snapshot
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # FINAL CHECK GATE
+  # ═══════════════════════════════════════════════════════════════════════════
+  all-checks:
+    name: All Checks Pass
+    runs-on: ubuntu-latest
+    needs: [lint, foundry-tests, hardhat-tests, invariant-tests, monetary-routing]
+    steps:
+      - name: All checks passed
+        run: echo "All CI checks passed successfully!"

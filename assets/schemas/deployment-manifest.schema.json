@@ -1,0 +1,191 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://securemint.engine/schemas/deployment-manifest.json",
+  "title": "Secure Mint Engine Deployment Manifest",
+  "description": "Schema for tracking deployed contract addresses and configuration",
+  "type": "object",
+  "required": ["version", "network", "contracts", "deployment_timestamp"],
+  "properties": {
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "network": {
+      "type": "object",
+      "required": ["name", "chain_id"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "enum": ["mainnet", "sepolia", "goerli", "arbitrum", "polygon", "base", "avalanche", "localhost"]
+        },
+        "chain_id": {
+          "type": "integer"
+        },
+        "rpc_url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "block_explorer": {
+          "type": "string",
+          "format": "uri"
+        }
+      }
+    },
+    "contracts": {
+      "type": "object",
+      "properties": {
+        "BackedToken": {
+          "$ref": "#/$defs/deployedContract"
+        },
+        "SecureMintPolicy": {
+          "$ref": "#/$defs/deployedContract"
+        },
+        "BackingOraclePoR": {
+          "$ref": "#/$defs/deployedContract"
+        },
+        "TreasuryVault": {
+          "$ref": "#/$defs/deployedContract"
+        },
+        "RedemptionEngine": {
+          "$ref": "#/$defs/deployedContract"
+        },
+        "EmergencyPause": {
+          "$ref": "#/$defs/deployedContract"
+        },
+        "SecureMintTimelock": {
+          "$ref": "#/$defs/deployedContract"
+        },
+        "SecureMintGovernor": {
+          "$ref": "#/$defs/deployedContract"
+        }
+      }
+    },
+    "deployment_timestamp": {
+      "type": "integer",
+      "description": "Unix timestamp of deployment"
+    },
+    "deployer": {
+      "type": "string",
+      "pattern": "^0x[a-fA-F0-9]{40}$"
+    },
+    "git_commit": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "constructor_args": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array"
+      }
+    },
+    "verification_status": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "verified": {
+            "type": "boolean"
+          },
+          "verification_url": {
+            "type": "string",
+            "format": "uri"
+          }
+        }
+      }
+    },
+    "initial_configuration": {
+      "type": "object",
+      "properties": {
+        "global_supply_cap": {
+          "type": "string"
+        },
+        "epoch_mint_cap": {
+          "type": "string"
+        },
+        "max_oracle_age": {
+          "type": "integer"
+        },
+        "treasury_allocations": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
+        }
+      }
+    },
+    "roles": {
+      "type": "object",
+      "properties": {
+        "admin": {
+          "type": "string",
+          "pattern": "^0x[a-fA-F0-9]{40}$"
+        },
+        "guardian": {
+          "type": "string",
+          "pattern": "^0x[a-fA-F0-9]{40}$"
+        },
+        "governor": {
+          "type": "string",
+          "pattern": "^0x[a-fA-F0-9]{40}$"
+        },
+        "minters": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^0x[a-fA-F0-9]{40}$"
+          }
+        },
+        "attestors": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^0x[a-fA-F0-9]{40}$"
+          }
+        }
+      }
+    },
+    "external_dependencies": {
+      "type": "object",
+      "properties": {
+        "chainlink_price_feed": {
+          "type": "string",
+          "pattern": "^0x[a-fA-F0-9]{40}$"
+        },
+        "chainlink_por_feed": {
+          "type": "string",
+          "pattern": "^0x[a-fA-F0-9]{40}$"
+        },
+        "reserve_asset": {
+          "type": "string",
+          "pattern": "^0x[a-fA-F0-9]{40}$"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "deployedContract": {
+      "type": "object",
+      "required": ["address"],
+      "properties": {
+        "address": {
+          "type": "string",
+          "pattern": "^0x[a-fA-F0-9]{40}$"
+        },
+        "deployment_tx": {
+          "type": "string",
+          "pattern": "^0x[a-fA-F0-9]{64}$"
+        },
+        "block_number": {
+          "type": "integer"
+        },
+        "gas_used": {
+          "type": "integer"
+        },
+        "bytecode_hash": {
+          "type": "string",
+          "pattern": "^0x[a-fA-F0-9]{64}$"
+        }
+      }
+    }
+  }
+}

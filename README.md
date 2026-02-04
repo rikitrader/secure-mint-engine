@@ -1,6 +1,45 @@
 # SecureMint Engine
 
-Oracle-Gated Secure Minting Protocol for Backed Tokens
+<div align="center">
+
+```
+  ____                           __  __ _       _
+ / ___|  ___  ___ _   _ _ __ ___|  \/  (_)_ __ | |_
+ \___ \ / _ \/ __| | | | '__/ _ \ |\/| | | '_ \| __|
+  ___) |  __/ (__| |_| | | |  __/ |  | | | | | | |_
+ |____/ \___|\___|\__,_|_|  \___|_|  |_|_|_| |_|\__|
+
+     Oracle-Gated Secure Minting Protocol v1.0
+```
+
+**Enterprise-grade oracle-gated secure minting protocol for backed tokens**
+
+[![Security Audit](https://img.shields.io/badge/Security-Audited-green.svg)](#security-audit)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Node.js](https://img.shields.io/badge/Node.js-18%2B-green.svg)](https://nodejs.org/)
+[![Solidity](https://img.shields.io/badge/Solidity-0.8.20-blue.svg)](https://soliditylang.org/)
+
+</div>
+
+---
+
+## Table of Contents
+
+- [Overview](#overview)
+- [Architecture](#architecture)
+- [Core Invariants](#core-invariants)
+- [Security Audit](#security-audit)
+- [Project Structure](#project-structure)
+- [Quick Start](#quick-start)
+- [Smart Contracts](#smart-contracts)
+- [API Gateway](#api-gateway)
+- [SDK Usage](#sdk-usage)
+- [Backtest Engine](#backtest-engine)
+- [Testing](#testing)
+- [Deployment](#deployment)
+- [License & Third-Party Disclosures](#license--third-party-disclosures)
+- [Contributing](#contributing)
+- [Contact](#contact)
 
 ---
 
@@ -10,51 +49,239 @@ Oracle-Gated Secure Minting Protocol for Backed Tokens
 
 ### Core Philosophy: Follow The Money
 
-Every token in circulation MUST have a verifiable, on-chain proof of backing. No backing proof = No minting.
+> Every token in circulation MUST have a verifiable, on-chain proof of backing.
+> **No backing proof = No minting.**
 
 ---
 
-## Key Features
+## Architecture
 
-### Oracle-Gated Minting
-- **INV-SM-1**: Tokens minted <= Total backing value (enforced on-chain)
-- **INV-SM-2**: Each mint requires fresh oracle attestation (max staleness: 1 hour)
-- **INV-SM-3**: Minting pauses automatically if backing ratio < 100%
-- **INV-SM-4**: All minting emits verifiable on-chain events
+### System Overview
 
-### Production-Ready Architecture
-- 8 Battle-Tested Smart Contracts (Solidity 0.8.20+)
-- Full TypeScript SDK with React hooks
-- The Graph Subgraph for indexed data
-- REST API Gateway for off-chain integration
-- Comprehensive Test Suite (unit, integration, foundry invariants)
+```
+                                    SECUREMINT ENGINE ARCHITECTURE
+    ================================================================================
 
-### God-Tier Launch Gates
-- **Legal Compliance Gate** - Regulatory classification analysis
-- **Security Audit Gate** - Audit firm management, finding tracker
-- **Tokenomics Stress Test** - Economic attack simulations
-- **Launch Countdown Orchestrator** - T-30 to T-0 coordination
+                                   +------------------+
+                                   |   FRONTEND       |
+                                   |   Dashboard      |
+                                   |   (React/Next)   |
+                                   +--------+---------+
+                                            |
+                                            | HTTPS/WSS
+                                            v
+    +-------------------+          +------------------+          +-------------------+
+    |                   |          |                  |          |                   |
+    |   EXTERNAL        |  REST/   |   API GATEWAY    |  Events  |   THE GRAPH       |
+    |   INTEGRATIONS    +--------->+   (Express)      +--------->+   SUBGRAPH        |
+    |                   |  GraphQL |                  |          |                   |
+    +-------------------+          +--------+---------+          +-------------------+
+                                            |
+                                            | ethers.js / JSON-RPC
+                                            v
+    ================================================================================
+                               BLOCKCHAIN LAYER (EVM)
+    ================================================================================
 
-### Enterprise Security
-- Emergency pause mechanisms
-- Multi-sig governance (Timelock + Governor)
-- Circuit breakers for abnormal conditions
-- Comprehensive monitoring and alerting
+         +-------------+     +------------------+     +-----------------+
+         |             |     |                  |     |                 |
+         | BackedToken +---->+ SecureMintPolicy +---->+ BackingOracle   |
+         | (ERC-20)    |     | (Authorization)  |     | (PoR Feed)      |
+         |             |     |                  |     |                 |
+         +------+------+     +--------+---------+     +--------+--------+
+                |                     |                        |
+                |                     v                        |
+                |            +------------------+              |
+                |            |                  |              |
+                +----------->+ TreasuryVault    +<-------------+
+                             | (Reserve Mgmt)   |
+                             |                  |
+                             +--------+---------+
+                                      |
+                                      v
+                             +------------------+
+                             |                  |
+                             | RedemptionEngine |
+                             | (Burn & Redeem)  |
+                             |                  |
+                             +------------------+
+
+    ================================================================================
+                              GOVERNANCE & SAFETY
+    ================================================================================
+
+         +-------------+     +------------------+     +-----------------+
+         |             |     |                  |     |                 |
+         |  Governor   +---->+    Timelock      +---->+ EmergencyPause  |
+         | (Voting)    |     | (Delay Actions)  |     | (Circuit Break) |
+         |             |     |                  |     |                 |
+         +-------------+     +------------------+     +-----------------+
+```
+
+### Request Flow Diagram
+
+```
+    USER REQUEST                API GATEWAY                    BLOCKCHAIN
+    ============               =============                  ============
+
+         +                          +                              +
+         |   1. Mint Request        |                              |
+         +------------------------->+                              |
+         |                          |                              |
+         |                          |  2. Validate JWT/Signature   |
+         |                          +--+                           |
+         |                          |  | Auth Middleware           |
+         |                          +<-+                           |
+         |                          |                              |
+         |                          |  3. Check Rate Limits        |
+         |                          +--+                           |
+         |                          |  | Redis Cache               |
+         |                          +<-+                           |
+         |                          |                              |
+         |                          |  4. Query Oracle State       |
+         |                          +----------------------------->+
+         |                          |                              |
+         |                          |  5. Oracle Response          |
+         |                          +<-----------------------------+
+         |                          |                              |
+         |                          |  6. Verify Backing Ratio     |
+         |                          +--+                           |
+         |                          |  | INV-SM-1 Check            |
+         |                          +<-+                           |
+         |                          |                              |
+         |                          |  7. Submit Mint TX           |
+         |                          +----------------------------->+
+         |                          |                              |
+         |                          |  8. TX Confirmation          |
+         |   9. Success Response    +<-----------------------------+
+         +<-------------------------+                              |
+         |                          |                              |
+         +                          +                              +
+```
+
+### Security Layers
+
+```
+    ================================================================================
+                           DEFENSE-IN-DEPTH SECURITY MODEL
+    ================================================================================
+
+    LAYER 1: NETWORK PERIMETER
+    +--------------------------------------------------------------------------+
+    |  WAF  |  DDoS Protection  |  TLS 1.3  |  IP Allowlisting  |  Rate Limit  |
+    +--------------------------------------------------------------------------+
+                                      |
+                                      v
+    LAYER 2: APPLICATION SECURITY
+    +--------------------------------------------------------------------------+
+    |  JWT Auth  |  Nonce Protection  |  RBAC  |  Input Validation  |  CORS    |
+    +--------------------------------------------------------------------------+
+                                      |
+                                      v
+    LAYER 3: API SECURITY
+    +--------------------------------------------------------------------------+
+    |  Zod Schema  |  GraphQL Depth Limit  |  Query Complexity  |  Sanitization|
+    +--------------------------------------------------------------------------+
+                                      |
+                                      v
+    LAYER 4: BLOCKCHAIN SECURITY
+    +--------------------------------------------------------------------------+
+    |  Oracle Gating  |  Reentrancy Guard  |  Access Control  |  Pausable     |
+    +--------------------------------------------------------------------------+
+                                      |
+                                      v
+    LAYER 5: OPERATIONAL SECURITY
+    +--------------------------------------------------------------------------+
+    |  Multi-Sig  |  Timelock  |  Emergency Pause  |  Audit Trail  |  Alerting |
+    +--------------------------------------------------------------------------+
+```
 
 ---
 
-## Smart Contracts
+## Core Invariants
 
-| Contract | Purpose |
-|----------|---------|
-| `BackedToken.sol` | ERC-20 token with oracle-gated mint |
-| `SecureMintPolicy.sol` | Mint authorization and invariant enforcement |
-| `BackingOraclePoR.sol` | Oracle aggregation and Proof-of-Reserve |
-| `TreasuryVault.sol` | Reserve management and asset custody |
-| `RedemptionEngine.sol` | Token redemption for backing assets |
-| `EmergencyPause.sol` | Circuit breaker and emergency controls |
-| `Governor.sol` | On-chain governance |
-| `Timelock.sol` | Time-delayed execution for governance |
+The SecureMint Engine enforces four critical invariants:
+
+| ID | Invariant | Description | Enforcement |
+|----|-----------|-------------|-------------|
+| **INV-SM-1** | `totalSupply <= backingValue` | Tokens minted never exceed total backing | On-chain + Oracle |
+| **INV-SM-2** | Fresh Oracle Attestation | Each mint requires oracle data < 1 hour old | Staleness check |
+| **INV-SM-3** | Auto-Pause on Under-backing | Minting pauses if backing ratio < 100% | Circuit breaker |
+| **INV-SM-4** | Event Emission | All mints emit verifiable on-chain events | Immutable logs |
+
+```
+    INVARIANT ENFORCEMENT FLOW
+    ==========================
+
+    Mint Request
+         |
+         v
+    +----+----+
+    | Check   |    INV-SM-2: Oracle freshness
+    | Oracle  +--> Staleness > 1hr? --> REJECT
+    | Age     |
+    +----+----+
+         |
+         v
+    +----+----+
+    | Check   |    INV-SM-1: Backing sufficiency
+    | Backing +--> supply + amount > backing? --> REJECT
+    | Ratio   |
+    +----+----+
+         |
+         v
+    +----+----+
+    | Check   |    INV-SM-3: System health
+    | Paused  +--> isPaused? --> REJECT
+    | State   |
+    +----+----+
+         |
+         v
+    +----+----+
+    | Execute |    INV-SM-4: Emit event
+    | Mint &  +--> MintExecuted(recipient, amount, backing)
+    | Log     |
+    +---------+
+```
+
+---
+
+## Security Audit
+
+### Audit Status
+
+This codebase has undergone comprehensive security review with the following findings addressed:
+
+| ID | Finding | Severity | Status |
+|----|---------|----------|--------|
+| SEC-001 | Hardcoded API keys | Critical | FIXED |
+| SEC-002 | Weak JWT secret | High | FIXED |
+| SEC-003 | No nonce protection (replay attacks) | High | FIXED |
+| SEC-004 | Missing signed transaction verification | High | FIXED |
+| SEC-007 | GraphQL introspection in production | Medium | FIXED |
+| SEC-008 | Per-user rate limiting | Medium | FIXED |
+| SEC-009 | Redis TLS configuration | Medium | FIXED |
+| SEC-010 | Zod schema validation | Medium | FIXED |
+
+### Security Checklists
+
+- [Stack A Checklist](security_audit/CHECKLIST_STACK_A.md) - Next.js + Node + Postgres + WalletConnect
+- [Stack C Checklist](security_audit/CHECKLIST_STACK_C.md) - EVM Solidity (Hardhat/Foundry)
+- [Remediation Plan](security_audit/REMEDIATION_PLAN.md) - Full audit remediation details
+
+### Regression Tests
+
+Security regression tests ensure vulnerabilities cannot be reintroduced:
+
+```bash
+# Run all security regression tests
+npm test -- --testPathPattern="REGRESSION_TESTS"
+
+# Individual test suites
+npm test -- auth.test.ts        # SEC-001, SEC-002, SEC-003
+npm test -- rate-limit.test.ts  # SEC-008
+npm test -- input.test.ts       # SEC-010
+```
 
 ---
 
@@ -63,17 +290,63 @@ Every token in circulation MUST have a verifiable, on-chain proof of backing. No
 ```
 secure-mint-engine/
 ├── assets/
-│   ├── contracts/           # Solidity smart contracts
-│   ├── test/                # Unit and integration tests
-│   ├── scripts/             # Deploy and utility scripts
-│   ├── sdk/                 # TypeScript SDK
-│   ├── subgraph/            # The Graph indexer
-│   ├── api-gateway/         # REST API server
-│   ├── dashboard/           # Admin monitoring UI
-│   └── config/              # Configuration files
-├── references/              # Technical documentation
-├── diagrams/                # Architecture diagrams
-└── docs/                    # User guides
+│   ├── contracts/              # Solidity smart contracts
+│   │   ├── src/
+│   │   │   ├── BackedToken.sol
+│   │   │   ├── SecureMintPolicy.sol
+│   │   │   ├── BackingOraclePoR.sol
+│   │   │   ├── TreasuryVault.sol
+│   │   │   ├── RedemptionEngine.sol
+│   │   │   ├── EmergencyPause.sol
+│   │   │   ├── Governor.sol
+│   │   │   └── Timelock.sol
+│   │   └── test/
+│   │       ├── unit/
+│   │       ├── integration/
+│   │       └── security/
+│   │
+│   ├── api-gateway/            # REST/GraphQL API server
+│   │   └── src/
+│   │       ├── server.ts
+│   │       ├── routes/
+│   │       │   └── mint.ts
+│   │       └── middleware/
+│   │           ├── auth.ts     # JWT + Signature auth
+│   │           └── cache.ts    # Rate limiting
+│   │
+│   ├── sdk/                    # TypeScript SDK
+│   │   └── src/
+│   │       ├── index.ts
+│   │       ├── react/          # React hooks
+│   │       └── compliance/     # Compliance checks
+│   │
+│   ├── subgraph/               # The Graph indexer
+│   ├── dashboard/              # Admin monitoring UI
+│   ├── scripts/
+│   │   └── backtest/           # Backtest engine
+│   │       ├── backtest-engine.ts
+│   │       └── index.ts
+│   ├── config/                 # Configuration files
+│   └── examples/
+│       ├── dapp/               # Example DApp
+│       └── cli/                # CLI examples
+│
+├── security_audit/             # Security documentation
+│   ├── CI_SECURITY.yml         # Security CI pipeline
+│   ├── CHECKLIST_STACK_A.md    # Web stack checklist
+│   ├── CHECKLIST_STACK_C.md    # Solidity checklist
+│   ├── REMEDIATION_PLAN.md     # Audit remediation
+│   └── REGRESSION_TESTS/       # Security tests
+│       ├── auth.test.ts
+│       ├── rate-limit.test.ts
+│       └── input.test.ts
+│
+├── docs/                       # Documentation
+│   └── guides/
+├── docker/                     # Docker configs
+├── tests/                      # Integration tests
+├── LICENSE                     # MIT License
+└── README.md                   # This file
 ```
 
 ---
@@ -82,37 +355,219 @@ secure-mint-engine/
 
 ### Prerequisites
 
-- Node.js 18+
-- npm or yarn
-- Foundry (for advanced testing)
+- **Node.js** 18+ ([download](https://nodejs.org/))
+- **npm** or **yarn**
+- **Foundry** (for Solidity testing) - [install](https://book.getfoundry.sh/getting-started/installation)
+- **Redis** (for rate limiting) - [install](https://redis.io/docs/getting-started/)
+- **PostgreSQL** (optional, for API persistence)
 
 ### Installation
 
 ```bash
-# Clone the repository
-git clone https://github.com/YOUR_USERNAME/secure-mint-engine.git
+# 1. Clone the repository
+git clone https://github.com/rikitrader/secure-mint-engine.git
 cd secure-mint-engine
 
-# Install dependencies
-cd assets
+# 2. Install contract dependencies
+cd assets/contracts
+npm install
+forge install
+
+# 3. Install API gateway dependencies
+cd ../api-gateway
 npm install
 
-# Configure environment
-cp config/.env.example config/.env
+# 4. Install SDK dependencies
+cd ../sdk
+npm install
 
-# Compile contracts
+# 5. Return to root
+cd ../..
+```
+
+### Environment Configuration
+
+```bash
+# Copy example environment files
+cp assets/config/.env.example assets/config/.env
+
+# Edit configuration
+nano assets/config/.env
+```
+
+**Required Environment Variables:**
+
+```env
+# JWT Configuration (REQUIRED - must be 32+ characters)
+JWT_SECRET=your-secure-random-secret-minimum-32-characters
+
+# Redis Configuration
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_PASSWORD=your-redis-password
+
+# Blockchain Configuration
+RPC_URL=https://mainnet.infura.io/v3/YOUR_KEY
+CHAIN_ID=1
+
+# Contract Addresses (after deployment)
+TOKEN_ADDRESS=0x...
+POLICY_ADDRESS=0x...
+ORACLE_ADDRESS=0x...
+TREASURY_ADDRESS=0x...
+```
+
+### Compile and Test
+
+```bash
+# Compile smart contracts
+cd assets/contracts
 npx hardhat compile
+forge build
 
 # Run tests
 npx hardhat test
+forge test
+
+# Run with coverage
+npx hardhat coverage
+forge coverage
 ```
+
+### Start Development Server
+
+```bash
+# Start Redis (if not running)
+redis-server
+
+# Start API Gateway
+cd assets/api-gateway
+npm run dev
+
+# Server runs on http://localhost:3000
+```
+
+---
+
+## Smart Contracts
+
+### Contract Overview
+
+| Contract | Purpose | Upgradeability |
+|----------|---------|----------------|
+| `BackedToken.sol` | ERC-20 token with oracle-gated mint | UUPS |
+| `SecureMintPolicy.sol` | Mint authorization and invariant enforcement | UUPS |
+| `BackingOraclePoR.sol` | Oracle aggregation and Proof-of-Reserve | UUPS |
+| `TreasuryVault.sol` | Reserve management and asset custody | UUPS |
+| `RedemptionEngine.sol` | Token redemption for backing assets | UUPS |
+| `EmergencyPause.sol` | Circuit breaker and emergency controls | Immutable |
+| `Governor.sol` | On-chain governance | Immutable |
+| `Timelock.sol` | Time-delayed execution | Immutable |
+
+### Deployment
+
+```bash
+# Deploy to local network
+cd assets/contracts
+npx hardhat node
+npx hardhat deploy --network localhost
+
+# Deploy to testnet
+npx hardhat deploy --network sepolia
+
+# Deploy to mainnet
+npx hardhat deploy --network mainnet
+
+# Verify contracts
+npx hardhat verify --network mainnet <CONTRACT_ADDRESS>
+```
+
+### Foundry Commands
+
+```bash
+# Build
+forge build
+
+# Test
+forge test -vvv
+
+# Test with gas report
+forge test --gas-report
+
+# Fuzz testing
+forge test --fuzz-runs 10000
+
+# Invariant testing
+forge test --match-contract "Invariant"
+
+# Coverage
+forge coverage
+
+# Security analysis with Slither
+slither .
+```
+
+---
+
+## API Gateway
+
+### Endpoints
+
+#### Authentication
+
+```
+POST /api/auth/nonce          - Request authentication nonce
+POST /api/auth/verify         - Verify signature and get JWT
+POST /api/auth/refresh        - Refresh JWT token
+```
+
+#### Minting
+
+```
+GET  /api/mint/capacity       - Get available mint capacity
+POST /api/mint/simulate       - Simulate mint transaction
+POST /api/mint/execute        - Execute mint (requires signature)
+GET  /api/mint/history        - Get mint history
+```
+
+#### Oracle
+
+```
+GET  /api/oracle/backing      - Get current backing ratio
+GET  /api/oracle/price        - Get oracle price feed
+GET  /api/oracle/health       - Check oracle health
+```
+
+#### Treasury
+
+```
+GET  /api/treasury/balance    - Get treasury balance
+GET  /api/treasury/reserves   - Get reserve breakdown
+```
+
+### Rate Limits
+
+| Tier | Limit | Window |
+|------|-------|--------|
+| Anonymous (IP) | 20 req | 1 min |
+| Authenticated (IP) | 100 req | 1 min |
+| Per-User | 100 req | 1 min |
+| Per-Wallet (mint ops) | 50 req | 1 min |
 
 ---
 
 ## SDK Usage
 
+### Installation
+
+```bash
+npm install @securemint/sdk
+```
+
+### Basic Usage
+
 ```typescript
-import { SecureMintSDK } from '@secure-mint/sdk';
+import { SecureMintSDK } from '@securemint/sdk';
 
 // Initialize SDK
 const sdk = new SecureMintSDK({
@@ -125,84 +580,338 @@ const sdk = new SecureMintSDK({
   }
 });
 
-// Check if minting is possible
+// Check mint eligibility
 const canMint = await sdk.policy.canMint(amount);
+console.log('Can mint:', canMint);
 
-// Get current backing ratio
+// Get backing ratio
 const ratio = await sdk.oracle.getBackingRatio();
+console.log('Backing ratio:', ratio);
+
+// Execute mint (with signature)
+const tx = await sdk.token.mint(recipient, amount);
+await tx.wait();
+```
+
+### React Hooks
+
+```typescript
+import { useSecureMint, useMintCapacity, useBackingRatio } from '@securemint/sdk/react';
+
+function MintComponent() {
+  const { mint, isLoading, error } = useSecureMint();
+  const { capacity } = useMintCapacity();
+  const { ratio } = useBackingRatio();
+
+  return (
+    <div>
+      <p>Backing Ratio: {ratio}%</p>
+      <p>Available Capacity: {capacity}</p>
+      <button onClick={() => mint(amount)} disabled={isLoading}>
+        Mint Tokens
+      </button>
+    </div>
+  );
+}
 ```
 
 ---
 
-## Launch Gates
+## Backtest Engine
 
-### 1. Legal Compliance Gate
+The Backtest Engine simulates protocol behavior under various market conditions to validate economic security.
+
+### Running Backtests
+
 ```bash
-npx ts-node scripts/legal/legal-compliance-gate.ts
+cd assets
+
+# Run baseline scenario (full year)
+npx ts-node scripts/backtest/backtest-engine.ts 2024-01-01 2024-12-31
+
+# Run specific scenarios
+npx ts-node -e "import('./scripts/backtest').then(m => m.runBacktest('BANK_RUN'))"
+npx ts-node -e "import('./scripts/backtest').then(m => m.runBacktest('ORACLE_STRESS'))"
+npx ts-node -e "import('./scripts/backtest').then(m => m.runBacktest('MARKET_CRASH'))"
+
+# Run all scenarios (CI integration)
+npx ts-node -e "import('./scripts/backtest').then(m => m.runAllScenarios())"
 ```
 
-### 2. Security Audit Gate
-```bash
-npx ts-node scripts/security/audit-gate.ts
-```
+### Available Scenarios
 
-### 3. Tokenomics Stress Test
-```bash
-npx ts-node scripts/tokenomics/stress-test.ts
-```
+| Scenario | Description | Duration |
+|----------|-------------|----------|
+| `BASELINE` | Normal market conditions | 1 year |
+| `BANK_RUN` | 15% hourly redemption rate | 3 months |
+| `ORACLE_STRESS` | 1% oracle failure probability | 6 months |
+| `MARKET_CRASH` | 30% price crash event | 6 months |
+| `COMBINED_STRESS` | All stress factors combined | 1 year |
 
-### 4. Launch Countdown Orchestrator
-```bash
-npx ts-node scripts/launch/countdown-orchestrator.ts
+### Backtest Metrics
+
+```
+    BACKTEST OUTPUT METRICS
+    =======================
+
+    Economic Security Score: 0-100
+    +------------------------+
+    |  Invariant Violations  |  -20 points each
+    |  Backing Ratio < 100%  |  -10 points per occurrence
+    |  Oracle Failures       |  -5 points per hour
+    |  Redemption Halts      |  -15 points each
+    +------------------------+
+
+    Pass Criteria:
+    - Score >= 80
+    - Zero invariant violations
 ```
 
 ---
 
 ## Testing
 
+### Unit Tests
+
 ```bash
-# Unit tests
+# Smart contracts (Hardhat)
+cd assets/contracts
 npx hardhat test
 
-# Coverage report
-npx hardhat coverage
-
-# Foundry invariant tests
+# Smart contracts (Foundry)
 forge test
+
+# API Gateway
+cd assets/api-gateway
+npm test
+
+# SDK
+cd assets/sdk
+npm test
+```
+
+### Security Tests
+
+```bash
+# Run all security tests
+npm test -- --testPathPattern="security"
+
+# Run regression tests
+npm test -- --testPathPattern="REGRESSION_TESTS"
+
+# Run with coverage
+npm test -- --coverage
+```
+
+### Fuzz Testing
+
+```bash
+# Foundry fuzz tests
+cd assets/contracts
+forge test --fuzz-runs 10000 --match-contract "Fuzz"
+
+# Echidna (if configured)
+echidna test/fuzzing/EchidnaSecureMint.sol --contract EchidnaSecureMint
+```
+
+### Invariant Testing
+
+```bash
+# Foundry invariant tests
+forge test --match-contract "Invariant" --fuzz-runs 1000 -vvv
 ```
 
 ---
 
-## Invariants
+## Deployment
 
-| ID | Invariant |
-|----|-----------|
-| INV-SM-1 | totalSupply <= backingValue |
-| INV-SM-2 | Fresh oracle attestation required |
-| INV-SM-3 | Auto-pause if backing < 100% |
-| INV-SM-4 | All mints emit events |
+### Deployment Checklist
+
+```
+    PRE-DEPLOYMENT CHECKLIST
+    ========================
+
+    [ ] All tests passing
+    [ ] Security audit complete
+    [ ] Slither analysis clean
+    [ ] Coverage > 80%
+    [ ] Backtest scenarios passing
+    [ ] Environment variables configured
+    [ ] Multi-sig wallets ready
+    [ ] Oracle feeds configured
+    [ ] Emergency contacts ready
+
+    DEPLOYMENT SEQUENCE
+    ===================
+
+    1. Deploy Timelock
+    2. Deploy Governor
+    3. Deploy EmergencyPause
+    4. Deploy BackingOraclePoR
+    5. Deploy TreasuryVault
+    6. Deploy SecureMintPolicy
+    7. Deploy BackedToken
+    8. Deploy RedemptionEngine
+    9. Configure permissions
+    10. Transfer ownership to Timelock
+```
+
+### CI/CD Pipeline
+
+The security CI pipeline in `security_audit/CI_SECURITY.yml` runs:
+
+1. **Dependency Audit** - npm audit + Snyk
+2. **Secrets Scan** - TruffleHog + pattern matching
+3. **Slither Analysis** - Static analysis for Solidity
+4. **Foundry Tests** - Unit, fuzz, and invariant tests
+5. **API Security Tests** - Authentication and authorization
+6. **ESLint Security** - Security rules for TypeScript
+7. **Backtest Engine** - Economic simulation
+8. **Regression Tests** - Security vulnerability prevention
+
+**All checks must pass before merge to main.**
 
 ---
 
-## License
+## License & Third-Party Disclosures
 
-This project is licensed under the MIT License.
+### Project License
+
+This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
+
+```
+MIT License
+
+Copyright (c) 2024 SecureMint Engine
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+### Third-Party Dependencies & Licenses
+
+#### Smart Contracts
+
+| Package | Version | License | Description |
+|---------|---------|---------|-------------|
+| [@openzeppelin/contracts](https://github.com/OpenZeppelin/openzeppelin-contracts) | ^5.0.0 | MIT | Secure smart contract library |
+| [@openzeppelin/contracts-upgradeable](https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable) | ^5.0.0 | MIT | Upgradeable contracts |
+| [@chainlink/contracts](https://github.com/smartcontractkit/chainlink) | ^0.8.0 | MIT | Oracle integration |
+| [hardhat](https://github.com/NomicFoundation/hardhat) | ^2.19.0 | MIT | Ethereum development environment |
+| [foundry](https://github.com/foundry-rs/foundry) | latest | MIT/Apache-2.0 | Smart contract toolkit |
+
+#### API Gateway
+
+| Package | Version | License | Description |
+|---------|---------|---------|-------------|
+| [express](https://github.com/expressjs/express) | ^4.18.0 | MIT | Web framework |
+| [ethers](https://github.com/ethers-io/ethers.js) | ^6.9.0 | MIT | Ethereum library |
+| [jsonwebtoken](https://github.com/auth0/node-jsonwebtoken) | ^9.0.0 | MIT | JWT authentication |
+| [ioredis](https://github.com/redis/ioredis) | ^5.3.0 | MIT | Redis client |
+| [zod](https://github.com/colinhacks/zod) | ^3.22.0 | MIT | Schema validation |
+| [graphql](https://github.com/graphql/graphql-js) | ^16.8.0 | MIT | GraphQL implementation |
+| [@apollo/server](https://github.com/apollographql/apollo-server) | ^4.9.0 | MIT | GraphQL server |
+| [helmet](https://github.com/helmetjs/helmet) | ^7.1.0 | MIT | Security headers |
+| [@prisma/client](https://github.com/prisma/prisma) | ^5.6.0 | Apache-2.0 | Database ORM |
+
+#### SDK
+
+| Package | Version | License | Description |
+|---------|---------|---------|-------------|
+| [ethers](https://github.com/ethers-io/ethers.js) | ^6.9.0 | MIT | Ethereum library |
+| [axios](https://github.com/axios/axios) | ^1.6.0 | MIT | HTTP client |
+| [ws](https://github.com/websockets/ws) | ^8.14.0 | MIT | WebSocket client |
+| [eventemitter3](https://github.com/primus/eventemitter3) | ^5.0.0 | MIT | Event emitter |
+
+#### Development Tools
+
+| Package | Version | License | Description |
+|---------|---------|---------|-------------|
+| [typescript](https://github.com/microsoft/TypeScript) | ^5.3.0 | Apache-2.0 | TypeScript compiler |
+| [jest](https://github.com/facebook/jest) | ^29.7.0 | MIT | Testing framework |
+| [eslint](https://github.com/eslint/eslint) | ^8.50.0 | MIT | Linting |
+| [prettier](https://github.com/prettier/prettier) | ^3.1.0 | MIT | Code formatting |
+| [supertest](https://github.com/ladjs/supertest) | ^6.3.0 | MIT | HTTP testing |
+
+### License Compliance Notes
+
+1. **MIT License** - Most dependencies are MIT licensed, allowing free use, modification, and distribution with attribution.
+
+2. **Apache-2.0 License** - TypeScript and Prisma use Apache-2.0, which requires preservation of copyright notices and includes patent grant provisions.
+
+3. **OpenZeppelin Contracts** - Used under MIT license. Security-audited implementations of ERC standards.
+
+4. **Chainlink Contracts** - Used under MIT license for oracle integration.
+
+### Notice for Redistributors
+
+When redistributing this software, you must:
+
+1. Include the original MIT license file
+2. Include copyright notices for all third-party dependencies
+3. Preserve attribution in source files
+4. Not use project names or logos to endorse derived products
 
 ---
 
-## Contact and Access
+## Contributing
 
-This repository contains protected source code.
+We welcome contributions! Please see our contributing guidelines:
 
-**To request access to the full source code, please email:**
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-YOUR_EMAIL@domain.com
+### Code Standards
 
-Please include:
-- Your name/organization
-- Intended use case
-- Brief description of your project
+- All code must pass security CI checks
+- Minimum 80% test coverage
+- Slither analysis must be clean
+- Follow existing code style (enforced by ESLint/Prettier)
 
 ---
 
-Built with security-first principles for the decentralized future.
+## Contact
+
+**Repository:** [github.com/rikitrader/secure-mint-engine](https://github.com/rikitrader/secure-mint-engine)
+
+**Author:** Ricardo Prieto
+
+For security vulnerabilities, please report responsibly via GitHub Security Advisories.
+
+---
+
+<div align="center">
+
+```
+    Built with security-first principles for the decentralized future.
+
+    ╔═══════════════════════════════════════════════════════════════╗
+    ║                                                               ║
+    ║   "No backing proof = No minting"                             ║
+    ║                                                               ║
+    ║   SecureMint Engine - Enterprise Oracle-Gated Minting         ║
+    ║                                                               ║
+    ╚═══════════════════════════════════════════════════════════════╝
+```
+
+**Copyright (c) 2024 SecureMint Engine - MIT License**
+
+</div>

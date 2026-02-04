@@ -1,0 +1,153 @@
+===============================================================================
+MONETARY ROUTING DECISION TREE (WITH LEGEND + EXAMPLES)
+===============================================================================
+
+LEGEND (RISK CODING):
+---------------------
+[GREEN]  = lowest risk / simplest / smallest attack surface
+[YELLOW] = moderate risk / requires strong controls
+[RED]    = high risk / complex trust assumptions / needs heavy simulation
+[BLACK]  = FATAL if misconfigured / bypassed / unbounded
+
+ROUTE MARKERS (FOR CI CHECK):
+-----------------------------
+[ROUTE:FIXED] [ROUTE:EMISSIONS] [ROUTE:SECURE_MINT] [ROUTE:CROSS_CHAIN]
+
+COLOR NOTE:
+-----------
+ASCII cannot render true colors. Bracket tags indicate intended risk level.
+
+===============================================================================
+
+                           ┌─────────────────────────────┐
+                           │   START: TOKEN DESIGN        │
+                           └──────────────┬──────────────┘
+                                          │
+                          ┌───────────────▼───────────────┐
+                          │ Is minting required after TGE?│
+                          └───────────────┬───────────────┘
+                                  NO      │       YES
+                                   │      │
+                                   │      ▼
+          ┌────────────────────────────────────────────────────┐
+          │ [GREEN] [ROUTE:FIXED] FIXED SUPPLY + OPTIONAL BURN │
+          │ - Genesis mint only                                 │
+          │ - No mint path after launch                         │
+          │ - Holder burn reduces totalSupply                   │
+          └───────────────┬────────────────────────────────────┘
+                          │
+                Invariants: INV-1..INV-3
+                Threat level: Low
+                          │
+                          ▼
+                 (Proceed to non-monetary modules)
+
+                                          │
+                                          ▼
+                      ┌──────────────────────────────────┐
+                      │ Is token backed / claiming value │
+                      │ from reserves or collateral?     │
+                      └───────────────┬──────────────────┘
+                               YES    │        NO
+                                │     │
+                                │     ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│ [YELLOW] [ROUTE:EMISSIONS] EMISSIONS / INCENTIVES TOKEN                │
+│ Strict MINTER policy contract (token stays "dumb")                     │
+│ - caps + per-epoch budgets                                             │
+│ - rate limits                                                          │
+│ - timelock + multisig                                                  │
+│ - emergency pause                                                      │
+│ [BLACK] NO unbounded mint paths                                        │
+└───────────────┬────────────────────────────────────────────────────────┘
+                │
+      Invariants: INV-4..INV-7
+      Simulate: cap bypass, role compromise, governance capture
+                │
+                ▼
+        ┌──────────────────────────────┐
+        │ Optional: cross-chain needed?│
+        └──────────────┬───────────────┘
+                       │
+                       ▼
+          (If YES -> route to CROSS-CHAIN block below)
+
+                                │
+                                ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│ [RED] [ROUTE:SECURE_MINT] STABLECOIN / BACKED TOKEN                    │
+│ PRIORITY PATH: ORACLE-GATED SECURE MINT (FOLLOW-THE-MONEY)             │
+│ - Proof-of-Reserve (preferred) or onchain collateral oracle gating     │
+│ - mint() reverts unless backing >= post-mint supply                    │
+│ - strict onchain mint policy: caps + rate limits                       │
+│ - timelock + multisig                                                  │
+│ - emergency pause (mandatory)                                          │
+│ [BLACK] Any discretionary mint bypass = NO-GO                          │
+└───────────────┬────────────────────────────────────────────────────────┘
+                │
+ Invariants: INV-SM-1..INV-SM-4 + oracle health invariants
+ Simulate: oracle failure, reserve mismatch, delayed PoR updates
+                │
+                ▼
+      ┌──────────────────────────────────────────────┐
+      │ Is the token deployed on multiple chains?     │
+      └───────────────┬──────────────────────────────┘
+               YES    │        NO
+                │     │
+                ▼     │
+┌────────────────────────────────────────────────────────────────────────┐
+│ [RED] [ROUTE:CROSS_CHAIN] CROSS-CHAIN TOKEN                            │
+│ PREFERRED: CANONICAL BURN-AND-MINT (issuer-controlled)                 │
+│ - burn on source chain                                                 │
+│ - mint on destination chain                                            │
+│ - global supply conservation invariant                                 │
+│ - per-chain issuer = timelock + multisig                               │
+│ - reconciliation tables REQUIRED                                       │
+│ [BLACK] Lockbox bridge honeypots discouraged unless unavoidable        │
+└───────────────┬────────────────────────────────────────────────────────┘
+                │
+ Invariants: INV-11..INV-13
+ Simulate: message verification failure, relayer compromise, mismatch
+                │
+                ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│ [YELLOW] SUPPLY RECONCILIATION (MANDATORY FOR CROSS-CHAIN)             │
+│ - per-chain supply snapshot                                            │
+│ - burn ↔ mint ledger                                                   │
+│ - global supply check                                                  │
+│ - DAO emergency halt on mismatch                                       │
+└────────────────────────────────────────────────────────────────────────┘
+
+===============================================================================
+EXAMPLE TOKENS MAPPED ONTO ROUTES (ILLUSTRATIVE)
+===============================================================================
+
+NOTE:
+These examples are conceptual mappings to help humans. They do NOT claim
+anything about current implementations or guarantees.
+
+[GREEN] FIXED SUPPLY + BURN (no post-launch mint)
+- Typical memecoins / simple governance tokens (fixed cap, burn optional)
+
+[YELLOW] EMISSIONS TOKEN (rate-limited minter + pause)
+- Typical staking reward tokens / incentive tokens / points-to-token systems
+
+[RED] SECURE MINT (Proof-of-Reserve / collateral-gated)
+- Reserve-backed stablecoins / wrapped assets / tokenized collateral claims
+
+[RED] CROSS-CHAIN BURN-AND-MINT (canonical issuer)
+- Native multi-chain issuer models (CCTP-style patterns conceptually)
+
+===============================================================================
+GLOBAL RULES ENFORCED BY THIS TREE
+===============================================================================
+
+• Backed token ⇒ [ROUTE:SECURE_MINT] is mandatory and has priority
+• Emissions ⇒ [ROUTE:EMISSIONS] strict minter policy required
+• Cross-chain ⇒ [ROUTE:CROSS_CHAIN] burn-and-mint preferred + reconciliation
+• Any unbounded mint path ⇒ [BLACK] NO-GO
+• Any invariant breach ⇒ pause + DAO escalation + evidence snapshot
+
+===============================================================================
+END MONETARY ROUTING DECISION TREE
+===============================================================================

@@ -1,0 +1,27 @@
+{
+  "name": "secure-mint-engine-subgraph",
+  "version": "1.0.0",
+  "description": "The Graph subgraph for Secure Mint Engine",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-org/secure-mint-engine"
+  },
+  "license": "MIT",
+  "scripts": {
+    "codegen": "graph codegen",
+    "build": "graph build",
+    "deploy": "graph deploy --node https://api.studio.thegraph.com/deploy/ secure-mint-engine",
+    "deploy:hosted": "graph deploy --product hosted-service your-org/secure-mint-engine",
+    "create-local": "graph create --node http://localhost:8020/ secure-mint-engine",
+    "remove-local": "graph remove --node http://localhost:8020/ secure-mint-engine",
+    "deploy-local": "graph deploy --node http://localhost:8020/ --ipfs http://localhost:5001 secure-mint-engine",
+    "test": "graph test"
+  },
+  "dependencies": {
+    "@graphprotocol/graph-cli": "0.60.0",
+    "@graphprotocol/graph-ts": "0.31.0"
+  },
+  "devDependencies": {
+    "matchstick-as": "0.5.2"
+  }
+}

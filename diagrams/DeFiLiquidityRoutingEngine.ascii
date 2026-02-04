@@ -1,0 +1,293 @@
+====================================================================
+            DEFI LIQUIDITY ROUTING ENGINE (YIELD LAYER)
+====================================================================
+
+PURPOSE: Treasury yield optimization with risk-tiered allocation
+INTEGRATION: TreasuryEngine, RiskEngine, EvidenceLoggingEngine
+
+====================================================================
+TREASURY ALLOCATION FLOW
+====================================================================
+
+            STABLECOIN TREASURY
+            (Protocol Reserves)
+                    |
+                    v
+            +------------------+
+            | RISK ENGINE      |
+            | Score Protocols  |
+            |                  |
+            | Evaluates:       |
+            | - TVL history    |
+            | - Audit status   |
+            | - Exploit record |
+            | - Age of proto   |
+            | - Insurance cov  |
+            +---------+--------+
+                      |
+      +---------------+----------------+
+      |               |                |
+      v               v                v
++-------------+ +-------------+ +-------------+
+| TIER 1      | | TIER 2      | | TIER 3      |
+| LOW RISK    | | MED RISK    | | HIGH RISK   |
+| (70% alloc) | | (20% alloc) | | (10% alloc) |
++------+------+ +------+------+ +------+------+
+       |               |               |
+       v               v               v
++-------------+ +-------------+ +-------------+
+| Aave v3     | | Curve       | | Uniswap v3  |
+| Compound v3 | | Convex      | | RWA Vaults  |
+| MakerDAO    | | Yearn       | | LP Farming  |
++------+------+ +------+------+ +------+------+
+       |               |               |
+       v               v               v
+  Yield: 2-5%    Yield: 5-12%   Yield: 12%+
+  Risk: Low      Risk: Medium   Risk: High
+
+====================================================================
+RISK SCORING MODEL
+====================================================================
+
+PROTOCOL RISK SCORE (0-100, higher = safer)
+─────────────────────────────────────────────────────────────────────
+
+  Factor                  | Weight | Scoring Criteria
+  ------------------------+--------+----------------------------------
+  TVL Stability           | 20%    | >1yr stable = 100, volatile = 50
+  Audit Quality           | 20%    | Top 3 firm = 100, none = 0
+  Exploit History         | 25%    | No exploits = 100, major = 0
+  Protocol Age            | 15%    | >3yr = 100, <6mo = 30
+  Insurance Coverage      | 10%    | Full = 100, partial = 50, none = 0
+  Governance Quality      | 10%    | Decentralized = 100, single key = 20
+
+  TIER THRESHOLDS:
+  - Tier 1 (Low Risk):    Score >= 80
+  - Tier 2 (Medium Risk): Score 50-79
+  - Tier 3 (High Risk):   Score < 50
+
+====================================================================
+YIELD STREAMS
+====================================================================
+
+                    ┌─────────────────┐
+                    │  TIER 1 POOLS   │
+                    │  (Aave/Compound)│
+                    └────────┬────────┘
+                             │
+                        yield stream
+                             │
+                             v
+                    ┌─────────────────┐
+                    │  TIER 2 POOLS   │
+                    │  (Curve/Convex) │
+                    └────────┬────────┘
+                             │
+                        yield stream
+                             │
+                             v
+                    ┌─────────────────┐
+                    │  TIER 3 POOLS   │
+                    │  (Uniswap/RWA)  │
+                    └────────┬────────┘
+                             │
+                        yield stream
+                             │
+                             v
+                    ┌─────────────────┐
+                    │ YIELD AGGREGATOR│
+                    │                 │
+                    │ Collects:       │
+                    │ - Interest      │
+                    │ - Trading fees  │
+                    │ - LP rewards    │
+                    │ - Staking yield │
+                    └────────┬────────┘
+                             │
+                             v
+                    ┌─────────────────┐
+                    │    TREASURY     │
+                    │   INFLOW        │
+                    └────────┬────────┘
+                             │
+         +-------------------+-------------------+
+         |                   |                   |
+         v                   v                   v
+  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
+  │  BUYBACK    │    │  STAKER     │    │  RESERVE    │
+  │  & BURN     │    │  REWARDS    │    │  BUFFER     │
+  │  (30%)      │    │  (40%)      │    │  (30%)      │
+  └─────────────┘    └─────────────┘    └─────────────┘
+
+====================================================================
+YIELD DISTRIBUTION RULES
+====================================================================
+
+DISTRIBUTION FORMULA:
+─────────────────────────────────────────────────────────────────────
+
+  total_yield = Σ(pool_yield[i]) for all active pools
+
+  buyback_amount    = total_yield * 0.30
+  rewards_amount    = total_yield * 0.40
+  reserve_amount    = total_yield * 0.30
+
+  IF reserve_buffer < target_buffer:
+      reserve_amount += (target_buffer - reserve_buffer) * 0.10
+      rewards_amount -= (target_buffer - reserve_buffer) * 0.10
+
+DISTRIBUTION FREQUENCY:
+─────────────────────────────────────────────────────────────────────
+  - Yield harvest: Weekly
+  - Rewards distribution: Weekly
+  - Buyback execution: Monthly
+  - Reserve top-up: As needed
+
+====================================================================
+AUTOMATION LAYER
+====================================================================
+
+  ┌──────────────────┐
+  │   APY MONITOR    │
+  │                  │
+  │ Tracks:          │
+  │ - Real-time APY  │
+  │ - Gas costs      │
+  │ - Slippage       │
+  │ - IL risk        │
+  └────────┬─────────┘
+           │
+           v
+  ┌──────────────────┐
+  │ RISK THRESHOLD   │
+  │                  │
+  │ Monitors:        │
+  │ - TVL changes    │
+  │ - Exploit alerts │
+  │ - Depeg events   │
+  │ - Oracle issues  │
+  └────────┬─────────┘
+           │
+           v
+  ┌──────────────────┐
+  │ REBALANCE ENGINE │
+  │                  │
+  │ Actions:         │
+  │ - Auto withdraw  │
+  │ - Auto deposit   │
+  │ - Tier migration │
+  │ - Emergency exit │
+  └──────────────────┘
+
+====================================================================
+REBALANCE RULES
+====================================================================
+
+AUTO-REBALANCE TRIGGERS:
+─────────────────────────────────────────────────────────────────────
+
+  Condition                        | Action
+  ---------------------------------+----------------------------------
+  Protocol risk score drops >20pts | Pull liquidity to lower tier
+  APY drops below threshold        | Migrate to higher yield pool
+  TVL drops >30% in 24hr           | Emergency exit + alert
+  Exploit detected                 | Instant withdrawal + pause
+  Gas optimal                      | Execute pending rebalances
+  Tier allocation drifts >5%       | Rebalance to target weights
+
+REBALANCE CONSTRAINTS:
+─────────────────────────────────────────────────────────────────────
+  - Max slippage: 0.5%
+  - Min position size: $10,000
+  - Max gas budget: 0.1% of position
+  - Cooldown period: 24hr between rebalances
+  - Multisig approval for >$1M moves
+
+====================================================================
+POOL WHITELIST (EXAMPLE)
+====================================================================
+
+TIER 1 - LOW RISK (Score >= 80)
+─────────────────────────────────────────────────────────────────────
+  Protocol      | Chain     | Asset  | Max Alloc | Score
+  --------------+-----------+--------+-----------+-------
+  Aave v3       | Ethereum  | USDC   | 30%       | 95
+  Aave v3       | Arbitrum  | USDC   | 15%       | 92
+  Compound v3   | Ethereum  | USDC   | 20%       | 90
+  MakerDAO DSR  | Ethereum  | DAI    | 20%       | 88
+
+TIER 2 - MEDIUM RISK (Score 50-79)
+─────────────────────────────────────────────────────────────────────
+  Protocol      | Chain     | Asset  | Max Alloc | Score
+  --------------+-----------+--------+-----------+-------
+  Curve 3pool   | Ethereum  | 3CRV   | 10%       | 75
+  Convex        | Ethereum  | cvxCRV | 8%        | 72
+  Yearn v3      | Ethereum  | yvUSDC | 7%        | 70
+
+TIER 3 - HIGH RISK (Score < 50)
+─────────────────────────────────────────────────────────────────────
+  Protocol      | Chain     | Asset  | Max Alloc | Score
+  --------------+-----------+--------+-----------+-------
+  Uniswap v3    | Ethereum  | LP     | 5%        | 45
+  RWA Vault     | Ethereum  | RWA    | 3%        | 40
+  Pendle        | Ethereum  | PT     | 2%        | 38
+
+====================================================================
+EMERGENCY PROCEDURES
+====================================================================
+
+EMERGENCY EXIT TRIGGERS:
+─────────────────────────────────────────────────────────────────────
+  - Protocol exploit confirmed
+  - Stablecoin depeg > 2%
+  - TVL exodus > 50% in 24hr
+  - Oracle manipulation detected
+  - Governance attack in progress
+
+EMERGENCY EXIT FLOW:
+─────────────────────────────────────────────────────────────────────
+
+  1. DETECT
+     └── Automated monitoring or manual alert
+
+  2. PAUSE
+     └── Halt all new deposits to affected protocol
+
+  3. ASSESS
+     └── Evaluate exposure and potential loss
+
+  4. WITHDRAW
+     └── Execute staged withdrawal (avoid slippage)
+     └── Priority: Largest positions first
+
+  5. REROUTE
+     └── Move funds to Tier 1 pools or treasury
+
+  6. REPORT
+     └── Log all actions to evidence chain
+     └── Notify DAO and stakeholders
+
+====================================================================
+INTEGRATION POINTS
+====================================================================
+
+→ TreasuryEngine       : Fund source and destination
+→ RiskEngine           : Protocol scoring and monitoring
+→ EvidenceLoggingEngine: Audit trail for all movements
+→ GovernanceEngine     : Approval for large allocations
+→ OracleEngine         : Price feeds for valuation
+→ AlertSystem          : Notifications for threshold breaches
+
+====================================================================
+INVARIANTS
+====================================================================
+
+INV-LIQ-1: total_deployed <= treasury_available
+INV-LIQ-2: tier_allocation[i] <= max_tier_allocation[i]
+INV-LIQ-3: protocol_allocation[p] <= protocol_max[p]
+INV-LIQ-4: sum(all_allocations) == total_deployed
+INV-LIQ-5: reserve_buffer >= min_reserve_buffer
+
+====================================================================
+END DEFI LIQUIDITY ROUTING ENGINE
+====================================================================

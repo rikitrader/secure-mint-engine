@@ -1,0 +1,266 @@
+====================================================================
+             ORACLE-GATED SECURITY MODEL (CORE DEFENSE)
+====================================================================
+
+PURPOSE: Multi-layer oracle validation and circuit breaker system
+INTEGRATION: SecureMintPolicy.sol, IBackingOracle.sol
+
+====================================================================
+ORACLE DATA FLOW
+====================================================================
+
+              [ PRICE ORACLE ]
+              (Chainlink / Pyth)
+                     |
+                     | price feeds
+                     v
+              [ RESERVE ORACLE ]
+              (Proof-of-Reserve)
+                     |
+                     | reserve attestations
+                     v
+              [ VOLATILITY ORACLE ]
+              (Historical volatility)
+                     |
+                     | risk metrics
+                     v
+           +---------------------+
+           | ORACLE AGGREGATOR   |
+           | Medianized Feeds    |
+           |                     |
+           | Functions:          |
+           | - Multi-source      |
+           |   aggregation       |
+           | - Outlier rejection |
+           | - Time-weighted     |
+           |   average (TWAP)    |
+           | - Confidence score  |
+           +----------+----------+
+                      |
+                      v
+            +-------------------+
+            | DATA VALIDATION   |
+            |                   |
+            | Checks:           |
+            | - Staleness       |
+            | - Deviation       |
+            | - Source count    |
+            | - Confidence      |
+            +-------------------+
+                      |
+          +-----------+-----------+
+          |                       |
+    DATA OK?                 DATA BAD?
+          |                       |
+          v                       v
++----------------------+   +----------------------+
+| MINT ENGINE ENABLED  |   | CIRCUIT BREAKER ON   |
+|                      |   | Pause Mint/Burn      |
+| Normal operations    |   |                      |
+| continue             |   | Actions:             |
++----------+-----------+   | - Block all mints    |
+           |               | - Optionally block   |
+           v               |   burns              |
++----------------------+   | - Emit PauseEvent    |
+| POLICY CHECKS        |   | - Log oracle state   |
+| Caps / Rate Limits   |   +----------+-----------+
+|                      |              |
+| Enforces:            |              v
+| - epoch_mint_cap     |   +----------------------+
+| - global_supply_cap  |   | GOVERNANCE ALERT     |
+| - rate_limit         |   | Multisig Intervention|
+| - health_factor      |   |                      |
++----------+-----------+   | Notifications:       |
+           |               | - On-chain event     |
+           v               | - Off-chain webhook  |
++----------------------+   | - DAO alert system   |
+| STABLECOIN CONTRACT  |   |                      |
+|                      |   | Response window:     |
+| mint() / burn()      |   | - 4hr manual review  |
++----------------------+   | - Auto-recovery if   |
+                           |   oracle recovers    |
+                           +----------------------+
+
+====================================================================
+ORACLE HEALTH CHECKS
+====================================================================
+
+CHECK 1: STALENESS
+─────────────────────────────────────────────────────────────────────
+  lastUpdate = oracle.latestTimestamp()
+  IF (block.timestamp - lastUpdate) > MAX_STALENESS:
+      RETURN unhealthy
+
+  Thresholds:
+  - Price feeds: 1 hour max
+  - PoR feeds: 24 hours max
+  - Volatility: 4 hours max
+
+CHECK 2: DEVIATION
+─────────────────────────────────────────────────────────────────────
+  currentPrice = oracle.latestAnswer()
+  twap = calculateTWAP(24h)
+  deviation = abs(currentPrice - twap) / twap
+
+  IF deviation > MAX_DEVIATION:
+      RETURN unhealthy
+
+  Thresholds:
+  - Stablecoins: 2% max deviation
+  - Volatile assets: 10% max deviation
+
+CHECK 3: SOURCE COUNT
+─────────────────────────────────────────────────────────────────────
+  sources = aggregator.getActiveSourceCount()
+  IF sources < MIN_SOURCES:
+      RETURN unhealthy
+
+  Thresholds:
+  - Price feeds: 3+ sources minimum
+  - PoR feeds: 1+ audited source
+
+CHECK 4: CONFIDENCE SCORE
+─────────────────────────────────────────────────────────────────────
+  confidence = aggregator.getConfidenceScore()
+  IF confidence < MIN_CONFIDENCE:
+      RETURN degraded_mode
+
+  Thresholds:
+  - High confidence: 95%+
+  - Medium confidence: 80-95%
+  - Low confidence: <80% (trigger alert)
+
+====================================================================
+CIRCUIT BREAKER TRIGGERS
+====================================================================
+
+AUTOMATIC TRIGGERS (No human intervention required):
+─────────────────────────────────────────────────────────────────────
+  Trigger                    | Action
+  ---------------------------+-------------------------------------
+  Oracle stale > 1hr         | Pause mint
+  Price deviation > 5%       | Pause mint + alert
+  PoR shows shortfall        | Pause mint + DAO escalation
+  Multiple sources disagree  | Pause mint + investigation
+  Oracle returns 0 or max    | Emergency pause all
+
+MANUAL TRIGGERS (Multisig required):
+─────────────────────────────────────────────────────────────────────
+  Trigger                    | Actors
+  ---------------------------+-------------------------------------
+  Emergency pause            | Guardian multisig (2-of-3)
+  Extended pause             | DAO vote
+  Resume operations          | Guardian + timelock (24hr)
+
+====================================================================
+FAIL-SAFES
+====================================================================
+
+  ┌──────────────────────────────────────────────────────────────┐
+  │                     DEFENSE IN DEPTH                         │
+  ├──────────────────────────────────────────────────────────────┤
+  │                                                              │
+  │  LAYER 1: Emergency Pause                                    │
+  │  └── Instant halt of mint operations                         │
+  │                                                              │
+  │  LAYER 2: Oracle deviation threshold                         │
+  │  └── Auto-pause if price moves > 5% from TWAP                │
+  │                                                              │
+  │  LAYER 3: Time-weighted price (TWAP)                         │
+  │  └── 24hr TWAP prevents flash manipulation                   │
+  │                                                              │
+  │  LAYER 4: Multisig override                                  │
+  │  └── Guardian can pause/unpause with 2-of-3                  │
+  │                                                              │
+  │  LAYER 5: Kill switch                                        │
+  │  └── Permanent disable of mint (irreversible)                │
+  │                                                              │
+  └──────────────────────────────────────────────────────────────┘
+
+====================================================================
+SECURITY STATE MACHINE
+====================================================================
+
+  ┌─────────────┐
+  │   NORMAL    │ ──── oracle healthy ────┐
+  │  OPERATION  │ <──────────────────────┐│
+  └──────┬──────┘                        ││
+         │                               ││
+    oracle unhealthy                     ││
+         │                               ││
+         v                               ││
+  ┌─────────────┐                        ││
+  │   DEGRADED  │ ── auto-recovery ──────┘│
+  │    MODE     │    (oracle recovers)    │
+  └──────┬──────┘                         │
+         │                                │
+    confirmed attack                      │
+    or extended outage                    │
+         │                                │
+         v                                │
+  ┌─────────────┐                         │
+  │  EMERGENCY  │ ── manual resume ───────┘
+  │   PAUSE     │    (multisig + timelock)
+  └──────┬──────┘
+         │
+    critical breach
+         │
+         v
+  ┌─────────────┐
+  │    KILL     │  (IRREVERSIBLE)
+  │   SWITCH    │  Mint permanently disabled
+  └─────────────┘
+
+====================================================================
+ORACLE INTERFACE SPECIFICATION
+====================================================================
+
+interface IBackingOracle {
+    // Core functions
+    function getVerifiedBacking() external view returns (uint256);
+    function isHealthy() external view returns (bool);
+
+    // Health metrics
+    function lastUpdateTimestamp() external view returns (uint256);
+    function getDeviationFromTWAP() external view returns (uint256);
+    function getConfidenceScore() external view returns (uint256);
+
+    // Circuit breaker
+    function isCircuitBreakerTriggered() external view returns (bool);
+    function getCircuitBreakerReason() external view returns (string);
+}
+
+====================================================================
+INTEGRATION WITH SECUREMINTPOLICY
+====================================================================
+
+function secureMint(address to, uint256 amount) external {
+    // Check 1: Oracle health
+    require(backingOracle.isHealthy(), "Oracle unhealthy");
+
+    // Check 2: Circuit breaker
+    require(!backingOracle.isCircuitBreakerTriggered(), "Circuit breaker active");
+
+    // Check 3: Backing verification
+    uint256 backing = backingOracle.getVerifiedBacking();
+    uint256 postMintSupply = totalSupply() + amount;
+    require(backing >= requiredBacking(postMintSupply), "Insufficient backing");
+
+    // Check 4: Rate limits
+    require(epochMinted + amount <= epochCap, "Epoch cap exceeded");
+    require(postMintSupply <= globalCap, "Global cap exceeded");
+
+    // Check 5: Pause status
+    require(!paused(), "Contract paused");
+
+    // Execute mint
+    _mint(to, amount);
+    epochMinted += amount;
+
+    // Log evidence
+    emit MintExecuted(to, amount, backing, block.timestamp);
+}
+
+====================================================================
+END ORACLE-GATED SECURITY MODEL
+====================================================================

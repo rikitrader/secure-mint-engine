@@ -1,0 +1,40 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/
+out/
+.next/
+coverage/
+
+# Foundry/Hardhat
+cache/
+artifacts/
+typechain-types/
+broadcast/
+
+# Generated files
+*.min.js
+*.min.css
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# IDE
+.idea/
+.vscode/
+
+# Misc
+*.log
+.DS_Store
+
+# Terraform
+.terraform/
+*.tfstate*
+
+# Documentation (keep as-is)
+docs/api/
+
+# Test snapshots
+__snapshots__/

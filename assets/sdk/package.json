@@ -1,0 +1,103 @@
+{
+  "name": "@securemint/sdk",
+  "version": "1.0.0",
+  "description": "SecureMint Engine - TypeScript SDK for oracle-gated secure minting",
+  "main": "dist/cjs/index.js",
+  "module": "dist/esm/index.js",
+  "types": "dist/types/index.d.ts",
+  "exports": {
+    ".": {
+      "require": "./dist/cjs/index.js",
+      "import": "./dist/esm/index.js",
+      "types": "./dist/types/index.d.ts"
+    },
+    "./react": {
+      "require": "./dist/cjs/react/index.js",
+      "import": "./dist/esm/react/index.js",
+      "types": "./dist/types/react/index.d.ts"
+    },
+    "./compliance": {
+      "require": "./dist/cjs/compliance/index.js",
+      "import": "./dist/esm/compliance/index.js",
+      "types": "./dist/types/compliance/index.d.ts"
+    }
+  },
+  "files": [
+    "dist/**/*",
+    "src/**/*",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "npm run build:cjs && npm run build:esm && npm run build:types",
+    "build:cjs": "tsc -p tsconfig.cjs.json",
+    "build:esm": "tsc -p tsconfig.esm.json",
+    "build:types": "tsc -p tsconfig.types.json",
+    "dev": "tsc -w -p tsconfig.esm.json",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "lint": "eslint 'src/**/*.ts' --fix",
+    "format": "prettier --write 'src/**/*.ts'",
+    "clean": "rm -rf dist coverage",
+    "typecheck": "tsc --noEmit",
+    "docs": "typedoc",
+    "prepublishOnly": "npm run clean && npm run build && npm run test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/securemint/sdk.git"
+  },
+  "keywords": [
+    "securemint",
+    "ethereum",
+    "sdk",
+    "stablecoin",
+    "defi",
+    "web3",
+    "blockchain",
+    "typescript",
+    "oracle",
+    "proof-of-reserve"
+  ],
+  "author": "SecureMint Team",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/securemint/sdk/issues"
+  },
+  "homepage": "https://docs.securemint.io/sdk",
+  "dependencies": {
+    "ethers": "^6.9.0",
+    "axios": "^1.6.0",
+    "ws": "^8.14.0",
+    "eventemitter3": "^5.0.0"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.0",
+    "@types/node": "^20.0.0",
+    "@types/ws": "^8.5.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "eslint": "^8.50.0",
+    "eslint-config-prettier": "^9.0.0",
+    "jest": "^29.7.0",
+    "prettier": "^3.1.0",
+    "ts-jest": "^29.1.0",
+    "typedoc": "^0.25.0",
+    "typescript": "^5.3.0"
+  },
+  "peerDependencies": {
+    "react": ">=17.0.0",
+    "react-dom": ">=17.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    },
+    "react-dom": {
+      "optional": true
+    }
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

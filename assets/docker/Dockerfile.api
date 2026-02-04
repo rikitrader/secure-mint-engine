@@ -1,0 +1,59 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# SecureMint Engine - API Gateway Dockerfile
+# Multi-stage build for production
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Stage 1: Build
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+# Install dependencies for native modules
+RUN apk add --no-cache python3 make g++
+
+# Copy package files
+COPY api-gateway/package*.json ./
+
+# Install dependencies
+RUN npm ci --only=production && npm cache clean --force
+
+# Copy source code
+COPY api-gateway/src ./src
+COPY api-gateway/tsconfig.json ./
+
+# Build TypeScript
+RUN npm run build
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Stage 2: Production
+# ═══════════════════════════════════════════════════════════════════════════════
+
+FROM node:20-alpine AS production
+
+# Security: Run as non-root user
+RUN addgroup -g 1001 -S securemint && \
+    adduser -S securemint -u 1001
+
+WORKDIR /app
+
+# Copy built application
+COPY --from=builder --chown=securemint:securemint /app/dist ./dist
+COPY --from=builder --chown=securemint:securemint /app/node_modules ./node_modules
+COPY --from=builder --chown=securemint:securemint /app/package.json ./
+
+# Set environment
+ENV NODE_ENV=production
+ENV PORT=3000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:3000/health || exit 1
+
+# Switch to non-root user
+USER securemint
+
+# Expose port
+EXPOSE 3000
+
+# Start application
+CMD ["node", "dist/server.js"]

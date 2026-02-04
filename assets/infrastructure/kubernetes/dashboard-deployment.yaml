@@ -1,0 +1,199 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: securemint-dashboard
+  namespace: securemint
+  labels:
+    app: securemint-dashboard
+    component: frontend
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: securemint-dashboard
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: securemint-dashboard
+        component: frontend
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "3000"
+        prometheus.io/path: "/api/metrics"
+    spec:
+      serviceAccountName: securemint-dashboard
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+        - name: dashboard
+          image: securemint/dashboard:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3000
+              name: http
+              protocol: TCP
+          env:
+            - name: NODE_ENV
+              value: "production"
+            - name: NEXT_PUBLIC_RPC_URL
+              valueFrom:
+                secretKeyRef:
+                  name: securemint-secrets
+                  key: rpc-url
+            - name: NEXT_PUBLIC_CHAIN_ID
+              valueFrom:
+                configMapKeyRef:
+                  name: securemint-config
+                  key: chain-id
+            - name: NEXT_PUBLIC_SUBGRAPH_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: securemint-config
+                  key: subgraph-url
+            - name: NEXT_PUBLIC_TOKEN_ADDRESS
+              valueFrom:
+                configMapKeyRef:
+                  name: securemint-contracts
+                  key: token-address
+            - name: NEXT_PUBLIC_POLICY_ADDRESS
+              valueFrom:
+                configMapKeyRef:
+                  name: securemint-contracts
+                  key: policy-address
+            - name: NEXT_PUBLIC_ORACLE_ADDRESS
+              valueFrom:
+                configMapKeyRef:
+                  name: securemint-contracts
+                  key: oracle-address
+            - name: NEXT_PUBLIC_TREASURY_ADDRESS
+              valueFrom:
+                configMapKeyRef:
+                  name: securemint-contracts
+                  key: treasury-address
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: next-cache
+              mountPath: /app/.next/cache
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: next-cache
+          emptyDir: {}
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - securemint-dashboard
+                topologyKey: kubernetes.io/hostname
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: securemint-dashboard
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: securemint-dashboard
+  namespace: securemint
+  labels:
+    app: securemint-dashboard
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: 3000
+      protocol: TCP
+      name: http
+  selector:
+    app: securemint-dashboard
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: securemint-dashboard
+  namespace: securemint
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: securemint-dashboard-hpa
+  namespace: securemint
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: securemint-dashboard
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+        - type: Pods
+          value: 2
+          periodSeconds: 60
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Pods
+          value: 1
+          periodSeconds: 120

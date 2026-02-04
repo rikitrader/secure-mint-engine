@@ -1,0 +1,332 @@
+===============================================================================
+SECURE MINT ENGINE — FULL SYSTEM WORKFLOW
+===============================================================================
+
+HOW TO INVOKE THIS SKILL:
+-------------------------
+Skill Name: secure-mint-engine
+
+Triggers automatically when ANY of these conditions are true:
+• money_mechanic_type == "stablecoin_backed"
+• backing_type != "none"
+• Project claims "1:1 backing", "fully backed", "redeemable"
+• Token marketed as "stable", "asset-backed", "reserve-backed"
+• Treasury/reserves referenced as justification for minting
+
+===============================================================================
+COMPLETE SYSTEM EXECUTION FLOW
+===============================================================================
+
+                    ┌─────────────────────────────────┐
+                    │         USER INPUT               │
+                    │  (Token design request)          │
+                    └───────────────┬─────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           SKILL TRIGGER CHECK                                │
+│  ┌─────────────────────────────────────────────────────────────────────┐    │
+│  │ Is ANY of the following true?                                        │    │
+│  │  □ money_mechanic_type == "stablecoin_backed"                        │    │
+│  │  □ backing_type != "none"                                            │    │
+│  │  □ Claims: "1:1 backed", "fully backed", "redeemable"                │    │
+│  │  □ Marketed as: "stable", "asset-backed", "reserve-backed"           │    │
+│  │  □ Treasury/reserves justify minting                                 │    │
+│  └─────────────────────────────────────────────────────────────────────┘    │
+│                           YES │           │ NO                               │
+│                               │           │                                  │
+│                               ▼           ▼                                  │
+│              ┌────────────────────┐  ┌─────────────────────────────┐        │
+│              │ ACTIVATE SKILL     │  │ Use different token engine  │        │
+│              │ secure-mint-engine │  │ (emissions, fixed supply)   │        │
+│              └────────┬───────────┘  └─────────────────────────────┘        │
+└───────────────────────┼─────────────────────────────────────────────────────┘
+                        │
+                        ▼
+╔═════════════════════════════════════════════════════════════════════════════╗
+║                    PHASE 0: MARKET INTELLIGENCE ENGINE                       ║
+║                         (MANDATORY PRE-INTAKE GATE)                          ║
+╠═════════════════════════════════════════════════════════════════════════════╣
+║                                                                              ║
+║  COLLECT INPUTS (Ask user if missing):                                       ║
+║  ┌────────────────────────────────────────────────────────────────────┐     ║
+║  │ • product_type: simple_fixed | emissions | stablecoin_backed |     │     ║
+║  │                 cross_chain | hybrid                               │     ║
+║  │ • risk_tolerance: low | medium | high                              │     ║
+║  │ • jurisdictions: US_exposure, EU_exposure                          │     ║
+║  │ • required_capabilities: [secure_mint_por, cross_chain, ...]       │     ║
+║  │ • timeline_pressure: low | medium | high                           │     ║
+║  └────────────────────────────────────────────────────────────────────┘     ║
+║                                    │                                         ║
+║                                    ▼                                         ║
+║  ┌─────────────────────────────────────────────────────────────────────┐    ║
+║  │ STEP 1: MARKET & ECOSYSTEM INTELLIGENCE                              │    ║
+║  │ • Analyze all chains (Ethereum, Solana, Avalanche, Polygon...)       │    ║
+║  │ • Evaluate: security, finality, governance, regulatory optics        │    ║
+║  │ • Map tooling: oracles, PoR providers, bridges, auditors             │    ║
+║  │ OUTPUT: Chain Comparison Table, Tooling Matrix, Risk Exclusion List  │    ║
+║  └─────────────────────────────────┬───────────────────────────────────┘    ║
+║                                    │                                         ║
+║                                    ▼                                         ║
+║  ┌─────────────────────────────────────────────────────────────────────┐    ║
+║  │ STEP 2: RISK-TOLERANCE SCORING ENGINE                                │    ║
+║  │ • Score chains 0-10 on 12 categories                                 │    ║
+║  │ • Apply risk-tolerance weights (sum to 1.0)                          │    ║
+║  │ • Calculate: weighted_score = Σ(score_i × weight_i)                  │    ║
+║  │ • Tier: 1 (≥80), 2 (65-79), 3 (<65)                                 │    ║
+║  │ OUTPUT: WEIGHTS.json, SCORING_MODEL.md, Scorecards                   │    ║
+║  └─────────────────────────────────┬───────────────────────────────────┘    ║
+║                                    │                                         ║
+║                                    ▼                                         ║
+║  ┌─────────────────────────────────────────────────────────────────────┐    ║
+║  │ STEP 3: LIVE DATA SIGNAL INTEGRATION                                 │    ║
+║  │ • TVL trends (DeFiLlama, L2Beat)                                     │    ║
+║  │ • Outage/incident history                                            │    ║
+║  │ • Exploit losses (Rekt, SlowMist)                                    │    ║
+║  │ • PoR availability per chain                                         │    ║
+║  │ OUTPUT: LIVE_DATA_SOURCES.md, LIVE_DATA_SCHEMA.json                  │    ║
+║  └─────────────────────────────────┬───────────────────────────────────┘    ║
+║                                    │                                         ║
+║                                    ▼                                         ║
+║  ┌─────────────────────────────────────────────────────────────────────┐    ║
+║  │ STEP 4: AUTO-ELIMINATION LOGIC                                       │    ║
+║  │                                                                       │    ║
+║  │ HARD FAIL (Instant Reject):                                          │    ║
+║  │ ├── stablecoin_backed + no PoR support                               │    ║
+║  │ ├── Any unbounded/discretionary mint path                            │    ║
+║  │ ├── cross_chain + no reconciliation                                  │    ║
+║  │ ├── No pause/kill-switch capability                                  │    ║
+║  │ └── Regulatory red-line breach                                       │    ║
+║  │                                                                       │    ║
+║  │ CONDITIONAL FAIL (Requires Mitigation):                              │    ║
+║  │ ├── Lock-and-mint bridge only                                        │    ║
+║  │ ├── High governance capture risk                                     │    ║
+║  │ └── Immature tooling + high timeline pressure                        │    ║
+║  │                                                                       │    ║
+║  │ OUTPUT: ELIMINATION_RULES.json, ELIMINATION_REPORT.md                │    ║
+║  └─────────────────────────────────┬───────────────────────────────────┘    ║
+║                                    │                                         ║
+║                                    ▼                                         ║
+║  ┌─────────────────────────────────────────────────────────────────────┐    ║
+║  │                  PHASE 0 SELECTION PACKET                            │    ║
+║  │                                                                       │    ║
+║  │  intake/DECISION_CONTEXT.json:                                       │    ║
+║  │  {                                                                    │    ║
+║  │    "allowed_chains": [...],                                          │    ║
+║  │    "conditional_chains": [...],                                      │    ║
+║  │    "rejected_chains": [...],                                         │    ║
+║  │    "preferred_oracle_stack": "...",                                  │    ║
+║  │    "preferred_proof_of_reserve": "...",                              │    ║
+║  │    "money_mechanic_constraints": [...],                              │    ║
+║  │    "security_red_lines": [...]                                       │    ║
+║  │  }                                                                    │    ║
+║  │                                                                       │    ║
+║  │  outputs/PHASE0_SELECTION_PACKET.md                                  │    ║
+║  └─────────────────────────────────┬───────────────────────────────────┘    ║
+║                                    │                                         ║
+╚════════════════════════════════════╪════════════════════════════════════════╝
+                                     │
+                                     ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           INTAKE BRAIN                                       │
+│                                                                              │
+│  Consumes DECISION_CONTEXT.json and routes to appropriate engine:           │
+│                                                                              │
+│  ┌─────────────────────────────────────────────────────────────────────┐    │
+│  │                   MONETARY ROUTING DECISION TREE                     │    │
+│  │                                                                       │    │
+│  │                    Is minting required after TGE?                     │    │
+│  │                           │                                           │    │
+│  │                    NO ────┴──── YES                                   │    │
+│  │                    │             │                                    │    │
+│  │                    ▼             ▼                                    │    │
+│  │              [ROUTE:FIXED]    Is token backed?                        │    │
+│  │              Fixed supply          │                                  │    │
+│  │                             NO ────┴──── YES                          │    │
+│  │                             │             │                           │    │
+│  │                             ▼             ▼                           │    │
+│  │                    [ROUTE:EMISSIONS]  [ROUTE:SECURE_MINT]            │    │
+│  │                    Rate-limited       ══════════════════             │    │
+│  │                    minter             ║ THIS ENGINE ║                │    │
+│  │                                       ══════════════════             │    │
+│  │                                              │                        │    │
+│  │                                              ▼                        │    │
+│  │                                    Is cross-chain needed?             │    │
+│  │                                         YES │                         │    │
+│  │                                             ▼                         │    │
+│  │                                   [ROUTE:CROSS_CHAIN]                 │    │
+│  │                                   Burn-and-mint +                     │    │
+│  │                                   reconciliation                      │    │
+│  └─────────────────────────────────────────────────────────────────────┘    │
+└───────────────────────────────────────┬─────────────────────────────────────┘
+                                        │
+                                        ▼
+╔═════════════════════════════════════════════════════════════════════════════╗
+║                      SECURE MINT ENGINE IMPLEMENTATION                       ║
+╠═════════════════════════════════════════════════════════════════════════════╣
+║                                                                              ║
+║  ARCHITECTURE:                                                               ║
+║  ┌─────────────────────────────────────────────────────────────────────┐    ║
+║  │                                                                       │    ║
+║  │    ┌─────────────────────────────────────────────────────────┐       │    ║
+║  │    │         ERC-20 TOKEN (DUMB LEDGER)                       │       │    ║
+║  │    │  • No business logic                                     │       │    ║
+║  │    │  • Mint ONLY callable by SecureMintPolicy                │       │    ║
+║  │    │  • Template: assets/contracts/BackedToken.sol            │       │    ║
+║  │    └─────────────────────────────┬───────────────────────────┘       │    ║
+║  │                                  │                                    │    ║
+║  │                                  ▲                                    │    ║
+║  │                           mint() │                                    │    ║
+║  │                                  │                                    │    ║
+║  │    ┌─────────────────────────────┴───────────────────────────┐       │    ║
+║  │    │         SECURE MINT POLICY CONTRACT                      │       │    ║
+║  │    │  Template: assets/contracts/SecureMintPolicy.sol         │       │    ║
+║  │    │                                                          │       │    ║
+║  │    │  MINTING ALLOWED IFF ALL CONDITIONS HOLD:                │       │    ║
+║  │    │  ┌────────────────────────────────────────────────────┐ │       │    ║
+║  │    │  │ 1. Verified backing exists (oracle check)          │ │       │    ║
+║  │    │  │ 2. backing >= required_backing(post_mint_supply)   │ │       │    ║
+║  │    │  │ 3. Oracle is healthy (not stale, not deviated)     │ │       │    ║
+║  │    │  │ 4. amount <= epoch_mint_cap                        │ │       │    ║
+║  │    │  │ 5. post_mint_supply <= global_cap                  │ │       │    ║
+║  │    │  │ 6. Contract is NOT paused                          │ │       │    ║
+║  │    │  └────────────────────────────────────────────────────┘ │       │    ║
+║  │    │                                                          │       │    ║
+║  │    │  IF ANY CONDITION FAILS → mint() REVERTS                 │       │    ║
+║  │    └─────────────────────────────┬───────────────────────────┘       │    ║
+║  │                                  │                                    │    ║
+║  │                                  ▲                                    │    ║
+║  │                    getVerifiedBacking() │ isHealthy()                 │    ║
+║  │                                  │                                    │    ║
+║  │    ┌─────────────────────────────┴───────────────────────────┐       │    ║
+║  │    │         BACKING ORACLE / PROOF-OF-RESERVE               │       │    ║
+║  │    │  Interface: assets/contracts/IBackingOracle.sol         │       │    ║
+║  │    │                                                          │       │    ║
+║  │    │  Mode A: On-chain collateral (price oracles + LTV)       │       │    ║
+║  │    │  Mode B: Off-chain PoR (Chainlink PoR feeds)             │       │    ║
+║  │    └─────────────────────────────┬───────────────────────────┘       │    ║
+║  │                                  │                                    │    ║
+║  │                                  ▲                                    │    ║
+║  │                          pause() │                                    │    ║
+║  │                                  │                                    │    ║
+║  │    ┌─────────────────────────────┴───────────────────────────┐       │    ║
+║  │    │         EMERGENCY PAUSE + GOVERNANCE                     │       │    ║
+║  │    │                                                          │       │    ║
+║  │    │  • Guardian multisig can pause                           │       │    ║
+║  │    │  • Auto-pause on: oracle failure, reserve mismatch       │       │    ║
+║  │    │  • Timelock on parameter changes (48h default)           │       │    ║
+║  │    │  • NO EOAs - multisig only                               │       │    ║
+║  │    └─────────────────────────────────────────────────────────┘       │    ║
+║  │                                                                       │    ║
+║  └─────────────────────────────────────────────────────────────────────┘    ║
+║                                                                              ║
+╚══════════════════════════════════════╪══════════════════════════════════════╝
+                                       │
+                                       ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        FORMAL INVARIANTS                                     │
+│  (Register with MonetaryFormalVerificationEngine)                           │
+│                                                                              │
+│  INV-SM-1: BackingAlwaysCoversSupply                                        │
+│            backing(t) >= required_backing(totalSupply(t))                   │
+│                                                                              │
+│  INV-SM-2: OracleHealthRequired                                             │
+│            mint allowed only if oracle_healthy == true                      │
+│                                                                              │
+│  INV-SM-3: MintIsBounded                                                    │
+│            minted(epoch) <= epoch_cap AND totalSupply <= global_cap         │
+│                                                                              │
+│  INV-SM-4: NoBypassPath                                                     │
+│            No contract or role can mint except SecureMintPolicy             │
+│                                                                              │
+│  ANY VIOLATION → IMMEDIATE PAUSE + DAO ESCALATION                           │
+└───────────────────────────────────────┬─────────────────────────────────────┘
+                                        │
+                                        ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      THREAT MODELING & SIMULATION                            │
+│                                                                              │
+│  REQUIRED SIMULATIONS:                                                       │
+│  ├── Oracle manipulation (flash loan, spot price attack)                    │
+│  ├── Oracle downtime (1h, 24h, permanent)                                   │
+│  ├── Reserve shortfall (5%, 20%, 50%, 100%)                                 │
+│  ├── Delayed PoR updates                                                    │
+│  └── Emergency pause race conditions                                        │
+│                                                                              │
+│  REQUIRED THREAT ANALYSIS:                                                   │
+│  ├── T1: Unbacked mint attempt                                              │
+│  ├── T2: Oracle compromise                                                  │
+│  ├── T3: Admin key compromise                                               │
+│  ├── T4: Governance capture                                                 │
+│  └── T5: False reserve reporting                                            │
+│                                                                              │
+│  ANY UNMITIGATED FATAL SCENARIO → NO-GO                                     │
+└───────────────────────────────────────┬─────────────────────────────────────┘
+                                        │
+                                        ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                            CI GUARDRAIL                                      │
+│                                                                              │
+│  Run: python3 scripts/monetary_routing_ci_check.py                          │
+│                                                                              │
+│  CHECKS:                                                                     │
+│  ├── PROJECT_CONTEXT.json money mechanic matches routing diagram            │
+│  ├── All required [ROUTE:*] markers present                                 │
+│  └── No HARD FAIL chains in allowed_chains                                  │
+│                                                                              │
+│  OUTPUT: outputs/MonetaryRoutingCIReport.md                                 │
+│                                                                              │
+│  EXIT CODE 0 = PASS │ EXIT CODE 1 = FAIL                                    │
+└───────────────────────────────────────┬─────────────────────────────────────┘
+                                        │
+                                        ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              DAO GATE                                        │
+│                                                                              │
+│  DEPLOYMENT BLOCKED IF:                                                      │
+│  ├── CI check fails                                                         │
+│  ├── DECISION_CONTEXT.json missing                                          │
+│  ├── Selected chain ∈ rejected_chains                                       │
+│  ├── Conditional chain without documented mitigations                       │
+│  ├── Any invariant violation possible                                       │
+│  └── Audit not complete                                                     │
+│                                                                              │
+│  APPROVAL REQUIRED FROM:                                                     │
+│  ├── Security team sign-off                                                 │
+│  ├── Audit firm sign-off                                                    │
+│  └── Governance vote (if applicable)                                        │
+└───────────────────────────────────────┬─────────────────────────────────────┘
+                                        │
+                                        ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          DEPLOYMENT + EVIDENCE                               │
+│                                                                              │
+│  ALL mint/burn events MUST be:                                              │
+│  ├── Immutably logged on-chain                                              │
+│  ├── Timestamped                                                            │
+│  └── Linked to oracle state at time of execution                            │
+│                                                                              │
+│  EVIDENCE LOGGING ENGINE captures:                                          │
+│  ├── Every Phase 0 decision                                                 │
+│  ├── Every CI check result                                                  │
+│  ├── Every oracle query                                                     │
+│  └── Every mint/burn transaction                                            │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+===============================================================================
+ABSOLUTE RULE (FOLLOW-THE-MONEY DOCTRINE)
+===============================================================================
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                                                                              │
+│   If backing cannot be proven ON-CHAIN or via trusted Proof-of-Reserve      │
+│   feeds, THE TOKEN MUST NOT BE MINTABLE.                                    │
+│                                                                              │
+│   Claims about backing without cryptographic enforcement                     │
+│   are treated as a HIGH-RISK / FRAUD VECTOR.                                │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+===============================================================================
+END FULL SYSTEM WORKFLOW
+===============================================================================

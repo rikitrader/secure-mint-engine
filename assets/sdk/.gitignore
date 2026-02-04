@@ -1,0 +1,41 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+lib/
+esm/
+cjs/
+types/
+*.tsbuildinfo
+
+# Environment
+.env
+!.env.example
+
+# Coverage
+coverage/
+.nyc_output/
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+
+# Logs
+*.log
+npm-debug.log*
+
+# Test
+.jest/
+jest-results/
+
+# Docs
+docs/api/
+typedoc/
+
+# Temp
+tmp/
+temp/

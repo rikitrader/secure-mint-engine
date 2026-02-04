@@ -1,0 +1,400 @@
+====================================================================
+          MASTER PROTOCOL CONTROL PANEL (UNIFIED COMMAND)
+====================================================================
+
+MISSION:
+One unified control surface that ties together all protocol engines:
+[TREASURY] + [PEG CONTROLLER] + [RISK ENGINE] + [GOVERNANCE] + [EMERGENCY]
+
+====================================================================
+HIGH-LEVEL CONTROL LOOP
+====================================================================
+
+        MARKET DATA + ORACLES + ON-CHAIN STATE + OFF-CHAIN RESERVES
+                         |
+                         |  ┌── Price oracles (Chainlink/Pyth)
+                         |  ├── DEX TWAP feeds
+                         |  ├── PoR attestations
+                         |  ├── TVL / liquidity data
+                         |  ├── Exploit alert feeds
+                         |  └── Reserve balance APIs
+                         |
+                         v
+                +----------------------+
+                |  SIGNAL INGESTION    |
+                |  (Data Aggregation)  |
+                |                      |
+                | Normalizes:          |
+                | - Oracle feeds       |
+                | - DEX TWAP           |
+                | - TVL / Liquidity    |
+                | - PoR attestations   |
+                | - Exploit alerts     |
+                +----------+-----------+
+                           |
+                           v
+                +----------------------+
+                |  RISK ENGINE         |
+                |  score 0..100        |
+                |                      |
+                | Calculates:          |
+                | - Composite risk     |
+                | - Per-category risks |
+                | - Trend direction    |
+                +----+-----------+-----+
+                     |           |
+           LOW/MED   |           | HIGH / CRITICAL
+           (0-65)    |           | (66-100)
+                     |           v
+                     |   +----------------------+
+                     |   | EMERGENCY SWITCH     |
+                     |   | circuit breaker      |
+                     |   |                      |
+                     |   | Triggers:            |
+                     |   | - Auto-pause mint    |
+                     |   | - Guardian alert     |
+                     |   | - Evidence snapshot  |
+                     |   +----+-----------+-----+
+                     |        |           |
+                     |        |           v
+                     |        |   +----------------------+
+                     |        |   | INCIDENT MODE        |
+                     |        |   |                      |
+                     |        |   | Actions:             |
+                     |        |   | - freeze treasury    |
+                     |        |   | - stop mint          |
+                     |        |   | - stop risky actions |
+                     |        |   | - notify governance  |
+                     |        |   +----------------------+
+                     |        |
+                     v        |
+            +----------------------+
+            | PEG CONTROLLER       |
+            | policy decisions     |
+            |                      |
+            | Manages:             |
+            | - fees               |
+            | - caps/rates         |
+            | - incentives         |
+            | - liquidity deploy   |
+            +----------+-----------+
+                       |
+                       v
+     +-----------------------------------------------------------+
+     |                  EXECUTION / ACTUATION                    |
+     |  (all actions are policy-gated + logged)                  |
+     +-----------+----------------------+------------------------+
+                 |                      |
+                 v                      v
+      +-------------------+    +------------------------------+
+      | TREASURY OPS      |    |  STABLECOIN CORE CONTRACTS    |
+      |                   |    |                               |
+      | - tier rebalance  |    |  - mint/burn gates            |
+      | - liquidity move  |    |  - caps/rate limits           |
+      | - reserve routing |    |  - redemption rules           |
+      +---------+---------+    +---------------+--------------+
+                |                              |
+                v                              v
+      +-------------------+          +--------------------------+
+      | RESERVE TIERS     |          | ON-CHAIN MARKETS         |
+      |                   |          |                          |
+      | T0 Hot / T1 Warm  |          | DEX / Lending / LPs      |
+      | T2 Cold / T3 RWA  |          | Liquidity + price impact |
+      +---------+---------+          +-------------+------------+
+                |                              |
+                +--------------+---------------+
+                               |
+                               v
+                    +------------------------+
+                    | AUDIT + TELEMETRY LOG  |
+                    |                        |
+                    | Records:               |
+                    | - who changed what     |
+                    | - mint/burn events     |
+                    | - treasury movements   |
+                    | - risk score history   |
+                    | - all policy decisions |
+                    +-----------+------------+
+                                |
+                                v
+                    +------------------------+
+                    | GOVERNANCE LAYER       |
+                    |                        |
+                    | - proposals/votes      |
+                    | - timelock execution   |
+                    | - parameter registry   |
+                    | - role permissions     |
+                    +-----------+------------+
+                                |
+                                v
+                +----------------------------------------+
+                | GOVERNANCE OUTPUTS                      |
+                |                                        |
+                | Can modify:                            |
+                | - update risk weights                  |
+                | - change caps/fees                     |
+                | - add/remove collateral types          |
+                | - rotate oracle sources                |
+                | - set emergency authority rules        |
+                +----------------------------------------+
+
+====================================================================
+ENGINE INTERCONNECTION MAP
+====================================================================
+
+┌─────────────────────────────────────────────────────────────────────┐
+│                     MASTER CONTROL PANEL                            │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  ┌─────────────┐     ┌─────────────┐     ┌─────────────┐           │
+│  │   SIGNAL    │────▶│    RISK     │────▶│  EMERGENCY  │           │
+│  │  INGESTION  │     │   ENGINE    │     │   SWITCH    │           │
+│  └──────┬──────┘     └──────┬──────┘     └──────┬──────┘           │
+│         │                   │                   │                   │
+│         │                   │                   │                   │
+│         ▼                   ▼                   ▼                   │
+│  ┌─────────────┐     ┌─────────────┐     ┌─────────────┐           │
+│  │    PEG      │◀───▶│  TREASURY   │◀───▶│ GOVERNANCE  │           │
+│  │ CONTROLLER  │     │   ENGINE    │     │   ENGINE    │           │
+│  └──────┬──────┘     └──────┬──────┘     └──────┬──────┘           │
+│         │                   │                   │                   │
+│         │                   │                   │                   │
+│         └───────────────────┴───────────────────┘                   │
+│                             │                                       │
+│                             ▼                                       │
+│                    ┌─────────────────┐                              │
+│                    │    EXECUTION    │                              │
+│                    │    + LOGGING    │                              │
+│                    └─────────────────┘                              │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+
+====================================================================
+DATA FLOW BETWEEN ENGINES
+====================================================================
+
+SIGNAL INGESTION → RISK ENGINE
+─────────────────────────────────────────────────────────────────────
+  Provides: Normalized market data, oracle health, exploit alerts
+  Frequency: Real-time / per-block
+
+RISK ENGINE → EMERGENCY SWITCH
+─────────────────────────────────────────────────────────────────────
+  Provides: Risk score, threshold breaches, anomaly flags
+  Frequency: Per-block when score changes
+
+RISK ENGINE → PEG CONTROLLER
+─────────────────────────────────────────────────────────────────────
+  Provides: Risk tier, recommended policy adjustments
+  Frequency: Continuous
+
+PEG CONTROLLER → TREASURY ENGINE
+─────────────────────────────────────────────────────────────────────
+  Provides: Liquidity deployment requests, tier rebalance orders
+  Frequency: On demand
+
+TREASURY ENGINE → EXECUTION
+─────────────────────────────────────────────────────────────────────
+  Provides: Authorized treasury movements, collateral releases
+  Frequency: Per transaction
+
+GOVERNANCE ENGINE → ALL ENGINES
+─────────────────────────────────────────────────────────────────────
+  Provides: Parameter updates, role changes, policy modifications
+  Frequency: After timelock expiry
+
+EMERGENCY SWITCH → ALL ENGINES
+─────────────────────────────────────────────────────────────────────
+  Provides: Pause commands, freeze commands, alert signals
+  Frequency: On trigger (immediate)
+
+====================================================================
+RULES OF THE PANEL (CORE INVARIANTS)
+====================================================================
+
+┌────────────────────────────────────────────────────────────────────┐
+│                                                                    │
+│  RULE 1: ORACLE + PoR GATING                                       │
+│  Minting is ALWAYS Oracle + PoR gated                              │
+│  NO exceptions. NO manual overrides for minting.                   │
+│                                                                    │
+├────────────────────────────────────────────────────────────────────┤
+│                                                                    │
+│  RULE 2: PRE-EMPTIVE THROTTLING                                    │
+│  Risk score can throttle issuance BEFORE insolvency                │
+│  Don't wait for crisis - prevent it.                               │
+│                                                                    │
+├────────────────────────────────────────────────────────────────────┤
+│                                                                    │
+│  RULE 3: SEPARATION OF DUTIES                                      │
+│  Treasury movement requires role + policy + logging                │
+│  No single entity can move funds unilaterally.                     │
+│                                                                    │
+├────────────────────────────────────────────────────────────────────┤
+│                                                                    │
+│  RULE 4: TIMELOCK EVERYTHING                                       │
+│  Governance changes are timelocked (no instant rug)                │
+│  Minimum 24hr for standard, 72hr for critical.                     │
+│                                                                    │
+├────────────────────────────────────────────────────────────────────┤
+│                                                                    │
+│  RULE 5: EMERGENCY SUPREMACY                                       │
+│  Emergency switch overrides everything (pause first, fix second)   │
+│  Safety > functionality > efficiency.                              │
+│                                                                    │
+└────────────────────────────────────────────────────────────────────┘
+
+====================================================================
+CONTROL PANEL STATES
+====================================================================
+
+STATE: NORMAL (Green)
+─────────────────────────────────────────────────────────────────────
+  Risk Score: 0-30
+  Operations: All enabled
+  Monitoring: Standard (5min intervals)
+  Treasury: Normal rebalancing
+  Governance: Standard proposals
+
+STATE: ELEVATED (Yellow)
+─────────────────────────────────────────────────────────────────────
+  Risk Score: 31-50
+  Operations: All enabled, caps tightened
+  Monitoring: Enhanced (1min intervals)
+  Treasury: Conservative mode
+  Governance: Expedited path available
+
+STATE: CAUTIOUS (Orange)
+─────────────────────────────────────────────────────────────────────
+  Risk Score: 51-65
+  Operations: Mint rate-limited, burns normal
+  Monitoring: Intensive (per-block)
+  Treasury: Liquidity pre-staged
+  Governance: Guardian on standby
+
+STATE: ALERT (Red)
+─────────────────────────────────────────────────────────────────────
+  Risk Score: 66-85
+  Operations: Mint paused, burns allowed
+  Monitoring: Critical (real-time alerts)
+  Treasury: Frozen pending review
+  Governance: Emergency path activated
+
+STATE: EMERGENCY (Black)
+─────────────────────────────────────────────────────────────────────
+  Risk Score: 86-100 OR manual trigger
+  Operations: All paused
+  Monitoring: Incident response mode
+  Treasury: Fully frozen
+  Governance: Recovery mode only
+
+====================================================================
+TRIGGER WORKFLOW (COMPLETE SEQUENCE)
+====================================================================
+
+USER ACTION → TRIGGER SEQUENCE:
+
+  1. User submits mint/burn request
+          │
+          ▼
+  2. Signal Ingestion validates current state
+          │
+          ▼
+  3. Risk Engine calculates risk score
+          │
+          ├── Score OK → Continue to step 4
+          │
+          └── Score HIGH → Emergency Switch activates
+                    │
+                    └── Pause operations
+                        Alert guardians
+                        Return error to user
+          │
+          ▼
+  4. Peg Controller checks policy compliance
+          │
+          ├── Policy OK → Continue to step 5
+          │
+          └── Policy FAIL → Reject with reason
+          │
+          ▼
+  5. Treasury Engine validates reserves
+          │
+          ├── Reserves OK → Continue to step 6
+          │
+          └── Reserves FAIL → Pause mint
+                              Allow redemption only
+          │
+          ▼
+  6. Execution Layer processes transaction
+          │
+          ▼
+  7. Audit Log records all details
+          │
+          ▼
+  8. User receives result
+
+====================================================================
+MONITORING DASHBOARD (CONCEPTUAL)
+====================================================================
+
+  ┌─────────────────────────────────────────────────────────────────┐
+  │ PROTOCOL CONTROL PANEL                          [NORMAL] 🟢    │
+  ├─────────────────────────────────────────────────────────────────┤
+  │                                                                 │
+  │  RISK SCORE:  [====░░░░░░░░░░░░░░░░░░]  23/100                 │
+  │                                                                 │
+  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐             │
+  │  │ TREASURY    │  │ PEG STATUS  │  │ RESERVES    │             │
+  │  │ $1.2B       │  │ $1.0001     │  │ 102.3%      │             │
+  │  │ ✓ Healthy   │  │ ✓ On-peg    │  │ ✓ Backed    │             │
+  │  └─────────────┘  └─────────────┘  └─────────────┘             │
+  │                                                                 │
+  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐             │
+  │  │ ORACLES     │  │ MINT TODAY  │  │ BURN TODAY  │             │
+  │  │ 5/5 Healthy │  │ $42M / $50M │  │ $38M        │             │
+  │  │ ✓ Fresh     │  │ 84% of cap  │  │ ✓ Normal    │             │
+  │  └─────────────┘  └─────────────┘  └─────────────┘             │
+  │                                                                 │
+  │  RECENT ALERTS: None                                           │
+  │  GOVERNANCE:    2 proposals pending                            │
+  │  GUARDIANS:     5/5 online                                     │
+  │                                                                 │
+  └─────────────────────────────────────────────────────────────────┘
+
+====================================================================
+FULL ENGINE LIBRARY (THIS SKILL)
+====================================================================
+
+  CORE ENGINES:
+  ├── SecureMintEngine         (oracle-gated minting)
+  ├── RiskScoringEngine        (composite risk calculation)
+  ├── PegStabilityEngine       (price stability mechanics)
+  ├── TreasuryReserveEngine    (reserve management)
+  ├── GovernanceControlEngine  (DAO + timelock)
+  └── EmergencyShutdownEngine  (circuit breaker)
+
+  SUPPORTING MODULES:
+  ├── OracleAggregator         (multi-source data)
+  ├── CrossChainBridge         (multi-chain operations)
+  ├── LiquidityRouter          (DeFi yield layer)
+  ├── EvidenceLogger           (audit trail)
+  └── CIGuardrail              (deployment gate)
+
+  DIAGRAMS IN THIS SKILL:
+  ├── FullSystemWorkflow.ascii
+  ├── MonetaryRouting.ascii
+  ├── StablecoinMintBurnFlow.ascii
+  ├── OracleGatedSecurityModel.ascii
+  ├── DeFiLiquidityRoutingEngine.ascii
+  ├── RiskScoringEngine.ascii
+  ├── GovernanceControlFlow.ascii
+  ├── EmergencyShutdownArchitecture.ascii
+  ├── TreasuryReserveArchitecture.ascii
+  ├── CrossChainBridgeSecurity.ascii
+  ├── PegStabilityMechanics.ascii
+  └── MasterProtocolControlPanel.ascii (THIS FILE)
+
+====================================================================
+END MASTER PROTOCOL CONTROL PANEL
+====================================================================

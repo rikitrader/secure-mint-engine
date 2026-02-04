@@ -1,0 +1,37 @@
+# SecureMint Engine - Code Owners
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default owners for everything
+*                       @securemint/core-team
+
+# Smart Contracts - requires security review
+/contracts/             @securemint/smart-contracts @securemint/security
+/contracts/src/         @securemint/smart-contracts @securemint/security
+/contracts/test/        @securemint/smart-contracts
+
+# SDK
+/sdk/                   @securemint/sdk-team
+
+# API Gateway
+/api-gateway/           @securemint/backend-team
+
+# Dashboard
+/dashboard/             @securemint/frontend-team
+
+# Mobile SDK
+/mobile-sdk/            @securemint/mobile-team
+
+# Infrastructure
+/infrastructure/        @securemint/devops
+/docker/                @securemint/devops
+
+# Documentation
+/docs/                  @securemint/docs-team
+
+# Security-sensitive files
+/contracts/certora/     @securemint/security
+/contracts/test/fuzzing/ @securemint/security
+/.github/               @securemint/core-team @securemint/security
+
+# CI/CD workflows
+/.github/workflows/     @securemint/devops @securemint/security

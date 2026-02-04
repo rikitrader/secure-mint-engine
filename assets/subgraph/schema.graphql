@@ -1,0 +1,375 @@
+"""
+Secure Mint Engine - The Graph Subgraph Schema
+Indexes all key events from the oracle-gated minting system
+"""
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# CORE ENTITIES
+# ═══════════════════════════════════════════════════════════════════════════════
+
+type Token @entity {
+  id: ID! # Token contract address
+  name: String!
+  symbol: String!
+  decimals: Int!
+  totalSupply: BigInt!
+  totalMinted: BigInt!
+  totalBurned: BigInt!
+
+  # Related entities
+  mints: [Mint!]! @derivedFrom(field: "token")
+  burns: [Burn!]! @derivedFrom(field: "token")
+  transfers: [Transfer!]! @derivedFrom(field: "token")
+
+  # Stats
+  holderCount: BigInt!
+  transferCount: BigInt!
+
+  # Timestamps
+  createdAt: BigInt!
+  createdAtBlock: BigInt!
+  lastUpdated: BigInt!
+}
+
+type Holder @entity {
+  id: ID! # Address
+  balance: BigInt!
+
+  # Activity
+  mintsReceived: [Mint!]! @derivedFrom(field: "recipient")
+  burns: [Burn!]! @derivedFrom(field: "burner")
+  transfersFrom: [Transfer!]! @derivedFrom(field: "from")
+  transfersTo: [Transfer!]! @derivedFrom(field: "to")
+  redemptionRequests: [RedemptionRequest!]! @derivedFrom(field: "user")
+
+  # Stats
+  totalMintedTo: BigInt!
+  totalBurned: BigInt!
+
+  # Timestamps
+  firstActivity: BigInt!
+  lastActivity: BigInt!
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# MINT EVENTS
+# ═══════════════════════════════════════════════════════════════════════════════
+
+type Mint @entity {
+  id: ID! # Transaction hash + log index
+  token: Token!
+  recipient: Holder!
+  amount: BigInt!
+
+  # Oracle data at time of mint
+  backingAtMint: BigInt!
+  supplyAfterMint: BigInt!
+  oracleTimestamp: BigInt!
+
+  # Transaction details
+  transactionHash: Bytes!
+  blockNumber: BigInt!
+  timestamp: BigInt!
+  gasUsed: BigInt
+}
+
+type Burn @entity {
+  id: ID! # Transaction hash + log index
+  token: Token!
+  burner: Holder!
+  amount: BigInt!
+  supplyAfterBurn: BigInt!
+
+  # Transaction details
+  transactionHash: Bytes!
+  blockNumber: BigInt!
+  timestamp: BigInt!
+}
+
+type Transfer @entity {
+  id: ID! # Transaction hash + log index
+  token: Token!
+  from: Holder!
+  to: Holder!
+  amount: BigInt!
+
+  # Transaction details
+  transactionHash: Bytes!
+  blockNumber: BigInt!
+  timestamp: BigInt!
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# ORACLE ENTITIES
+# ═══════════════════════════════════════════════════════════════════════════════
+
+type Oracle @entity {
+  id: ID! # Oracle contract address
+  isHealthy: Boolean!
+  verifiedBacking: BigInt!
+  lastUpdate: BigInt!
+  minAttestors: Int!
+  backingRatio: BigInt!
+
+  # Related entities
+  attestations: [Attestation!]! @derivedFrom(field: "oracle")
+  healthChanges: [OracleHealthChange!]! @derivedFrom(field: "oracle")
+
+  # Stats
+  attestationCount: BigInt!
+
+  # Timestamps
+  createdAt: BigInt!
+  lastUpdated: BigInt!
+}
+
+type Attestation @entity {
+  id: ID! # Transaction hash + log index
+  oracle: Oracle!
+  attestor: Bytes!
+  backing: BigInt!
+  proof: Bytes!
+
+  # Transaction details
+  transactionHash: Bytes!
+  blockNumber: BigInt!
+  timestamp: BigInt!
+}
+
+type OracleHealthChange @entity {
+  id: ID! # Transaction hash + log index
+  oracle: Oracle!
+  wasHealthy: Boolean!
+  isHealthy: Boolean!
+  reason: String
+
+  # Transaction details
+  transactionHash: Bytes!
+  blockNumber: BigInt!
+  timestamp: BigInt!
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# TREASURY ENTITIES
+# ═══════════════════════════════════════════════════════════════════════════════
+
+type Treasury @entity {
+  id: ID! # Treasury contract address
+  reserveAsset: Bytes!
+  totalReserves: BigInt!
+
+  # Tier balances
+  tier0Balance: BigInt! # HOT
+  tier1Balance: BigInt! # WARM
+  tier2Balance: BigInt! # COLD
+  tier3Balance: BigInt! # RWA
+
+  # Target allocations (basis points)
+  tier0Allocation: BigInt!
+  tier1Allocation: BigInt!
+  tier2Allocation: BigInt!
+  tier3Allocation: BigInt!
+
+  # Related entities
+  deposits: [TreasuryDeposit!]! @derivedFrom(field: "treasury")
+  withdrawals: [TreasuryWithdrawal!]! @derivedFrom(field: "treasury")
+  rebalances: [TreasuryRebalance!]! @derivedFrom(field: "treasury")
+
+  # Timestamps
+  createdAt: BigInt!
+  lastUpdated: BigInt!
+}
+
+type TreasuryDeposit @entity {
+  id: ID! # Transaction hash + log index
+  treasury: Treasury!
+  depositor: Bytes!
+  amount: BigInt!
+  tier: Int
+
+  # Transaction details
+  transactionHash: Bytes!
+  blockNumber: BigInt!
+  timestamp: BigInt!
+}
+
+type TreasuryWithdrawal @entity {
+  id: ID! # Transaction hash + log index
+  treasury: Treasury!
+  recipient: Bytes!
+  amount: BigInt!
+  tier: Int
+  reason: String
+
+  # Transaction details
+  transactionHash: Bytes!
+  blockNumber: BigInt!
+  timestamp: BigInt!
+}
+
+type TreasuryRebalance @entity {
+  id: ID! # Transaction hash + log index
+  treasury: Treasury!
+
+  # Balances before
+  tier0Before: BigInt!
+  tier1Before: BigInt!
+  tier2Before: BigInt!
+  tier3Before: BigInt!
+
+  # Balances after
+  tier0After: BigInt!
+  tier1After: BigInt!
+  tier2After: BigInt!
+  tier3After: BigInt!
+
+  # Transaction details
+  transactionHash: Bytes!
+  blockNumber: BigInt!
+  timestamp: BigInt!
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# REDEMPTION ENTITIES
+# ═══════════════════════════════════════════════════════════════════════════════
+
+type RedemptionRequest @entity {
+  id: ID! # User address (only one pending per user)
+  user: Holder!
+  amount: BigInt!
+  status: RedemptionStatus!
+  requestTimestamp: BigInt!
+  unlockTimestamp: BigInt!
+
+  # Execution details (if executed)
+  executedAmount: BigInt
+  feeAmount: BigInt
+  surchargeAmount: BigInt
+  executionTimestamp: BigInt
+
+  # Transaction details
+  requestTxHash: Bytes!
+  executionTxHash: Bytes
+  blockNumber: BigInt!
+}
+
+enum RedemptionStatus {
+  PENDING
+  EXECUTED
+  CANCELLED
+}
+
+type DailyRedemptionStats @entity {
+  id: ID! # Date string (YYYY-MM-DD)
+  date: BigInt!
+  totalRequested: BigInt!
+  totalExecuted: BigInt!
+  totalCancelled: BigInt!
+  requestCount: BigInt!
+  executionCount: BigInt!
+  cancellationCount: BigInt!
+  avgRedemptionSize: BigInt!
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# EMERGENCY PAUSE ENTITIES
+# ═══════════════════════════════════════════════════════════════════════════════
+
+type EmergencyState @entity {
+  id: ID! # Contract address
+  currentLevel: Int!
+  isPaused: Boolean!
+  lastLevelChange: BigInt!
+
+  # Related entities
+  levelChanges: [AlertLevelChange!]! @derivedFrom(field: "emergencyState")
+
+  # Timestamps
+  createdAt: BigInt!
+  lastUpdated: BigInt!
+}
+
+type AlertLevelChange @entity {
+  id: ID! # Transaction hash + log index
+  emergencyState: EmergencyState!
+  previousLevel: Int!
+  newLevel: Int!
+  changedBy: Bytes!
+  reason: String!
+
+  # Transaction details
+  transactionHash: Bytes!
+  blockNumber: BigInt!
+  timestamp: BigInt!
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# GOVERNANCE ENTITIES
+# ═══════════════════════════════════════════════════════════════════════════════
+
+type GovernanceProposal @entity {
+  id: ID! # Proposal ID
+  proposer: Bytes!
+  description: String!
+  targets: [Bytes!]!
+  values: [BigInt!]!
+  calldatas: [Bytes!]!
+
+  # Voting
+  forVotes: BigInt!
+  againstVotes: BigInt!
+  abstainVotes: BigInt!
+
+  # Status
+  status: ProposalStatus!
+  vetoed: Boolean!
+  vetoedBy: Bytes
+
+  # Timestamps
+  proposedAt: BigInt!
+  votingStartBlock: BigInt!
+  votingEndBlock: BigInt!
+  executedAt: BigInt
+  cancelledAt: BigInt
+}
+
+enum ProposalStatus {
+  PENDING
+  ACTIVE
+  CANCELLED
+  DEFEATED
+  SUCCEEDED
+  QUEUED
+  EXPIRED
+  EXECUTED
+  VETOED
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# DAILY STATS
+# ═══════════════════════════════════════════════════════════════════════════════
+
+type DailyStats @entity {
+  id: ID! # Date string (YYYY-MM-DD)
+  date: BigInt!
+
+  # Supply metrics
+  totalSupply: BigInt!
+  totalMinted: BigInt!
+  totalBurned: BigInt!
+
+  # Backing metrics
+  verifiedBacking: BigInt!
+  healthFactor: BigInt!
+
+  # Activity metrics
+  mintCount: BigInt!
+  burnCount: BigInt!
+  transferCount: BigInt!
+  uniqueActiveUsers: BigInt!
+
+  # Volume metrics
+  mintVolume: BigInt!
+  burnVolume: BigInt!
+  transferVolume: BigInt!
+}

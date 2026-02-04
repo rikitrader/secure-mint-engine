@@ -1,0 +1,79 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: securemint-config
+  namespace: securemint
+  labels:
+    app: securemint
+data:
+  chain-id: "1"
+  network-name: "Ethereum Mainnet"
+  subgraph-url: "https://api.thegraph.com/subgraphs/name/securemint/protocol"
+  epoch-duration: "86400"
+  staleness-threshold: "3600"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: securemint-contracts
+  namespace: securemint
+  labels:
+    app: securemint
+data:
+  token-address: "0x0000000000000000000000000000000000000000"
+  policy-address: "0x0000000000000000000000000000000000000000"
+  oracle-address: "0x0000000000000000000000000000000000000000"
+  treasury-address: "0x0000000000000000000000000000000000000000"
+  redemption-address: "0x0000000000000000000000000000000000000000"
+  governor-address: "0x0000000000000000000000000000000000000000"
+  emergency-address: "0x0000000000000000000000000000000000000000"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: securemint-alerting-rules
+  namespace: securemint
+  labels:
+    app: securemint
+data:
+  rules.json: |
+    {
+      "rules": [
+        {
+          "name": "solvency_violation",
+          "condition": "supply > backing",
+          "severity": "critical",
+          "channels": ["pagerduty", "slack", "discord"]
+        },
+        {
+          "name": "rate_limit_exceeded",
+          "condition": "epochMinted > epochCapacity",
+          "severity": "critical",
+          "channels": ["pagerduty", "slack"]
+        },
+        {
+          "name": "oracle_stale",
+          "condition": "oracleAge > stalenessThreshold",
+          "severity": "high",
+          "channels": ["slack", "discord"]
+        },
+        {
+          "name": "emergency_activated",
+          "condition": "emergencyLevel >= 3",
+          "severity": "critical",
+          "channels": ["pagerduty", "slack", "discord", "telegram"]
+        },
+        {
+          "name": "large_mint",
+          "condition": "mintAmount > epochCapacity * 0.1",
+          "severity": "medium",
+          "channels": ["slack"]
+        },
+        {
+          "name": "backing_drop",
+          "condition": "backingChange < -0.05",
+          "severity": "high",
+          "channels": ["slack", "discord"]
+        }
+      ]
+    }

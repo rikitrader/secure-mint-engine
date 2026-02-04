@@ -1,0 +1,95 @@
+# SecureMintEngine Foundry Configuration
+# https://book.getfoundry.sh/reference/config/
+
+[profile.default]
+src = "contracts"
+out = "out"
+libs = ["lib"]
+test = "test"
+cache_path = "cache_forge"
+
+# Solidity settings
+solc = "0.8.20"
+evm_version = "paris"
+optimizer = true
+optimizer_runs = 200
+via_ir = true
+
+# Compiler settings
+auto_detect_solc = false
+offline = false
+ignored_error_codes = [1878, 5574]
+
+# Testing settings
+fuzz = { runs = 256 }
+invariant = { runs = 256, depth = 15, fail_on_revert = true }
+verbosity = 2
+
+# Fork settings
+eth_rpc_url = "${MAINNET_RPC_URL}"
+fork_block_number = 18500000
+
+# Gas settings
+gas_limit = 30000000
+gas_price = 100000000000
+
+# Additional settings
+ffi = false
+fs_permissions = [{ access = "read", path = "./"}]
+
+[profile.default.rpc_endpoints]
+mainnet = "${MAINNET_RPC_URL}"
+sepolia = "${SEPOLIA_RPC_URL}"
+arbitrum = "${ARBITRUM_RPC_URL}"
+polygon = "${POLYGON_RPC_URL}"
+base = "${BASE_RPC_URL}"
+
+[profile.ci]
+fuzz = { runs = 10000 }
+invariant = { runs = 1000, depth = 50 }
+verbosity = 3
+
+[profile.lite]
+fuzz = { runs = 32 }
+invariant = { runs = 32, depth = 5 }
+verbosity = 2
+
+[profile.deep]
+fuzz = { runs = 50000 }
+invariant = { runs = 5000, depth = 100 }
+verbosity = 4
+
+# Formatter settings
+[fmt]
+line_length = 100
+tab_width = 4
+bracket_spacing = true
+int_types = "long"
+multiline_func_header = "params_first"
+quote_style = "double"
+number_underscore = "thousands"
+single_line_statement_blocks = "preserve"
+override_spacing = false
+wrap_comments = false
+ignore = ["test/*", "script/*"]
+
+# Documentation
+[doc]
+out = "docs"
+repository = "https://github.com/your-org/secure-mint-engine"
+
+# Etherscan verification
+[etherscan]
+mainnet = { key = "${ETHERSCAN_API_KEY}" }
+sepolia = { key = "${ETHERSCAN_API_KEY}" }
+arbitrum = { key = "${ARBISCAN_API_KEY}" }
+polygon = { key = "${POLYGONSCAN_API_KEY}" }
+base = { key = "${BASESCAN_API_KEY}" }
+
+# Remappings
+[profile.default.remappings]
+"@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/"
+"@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/"
+"@chainlink/contracts/=lib/chainlink/contracts/"
+"forge-std/=lib/forge-std/src/"
+"ds-test/=lib/forge-std/lib/ds-test/src/"

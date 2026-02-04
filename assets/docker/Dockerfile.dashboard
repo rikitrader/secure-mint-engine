@@ -1,0 +1,71 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# SecureMint Engine - Dashboard Dockerfile
+# Next.js production build
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Stage 1: Dependencies
+FROM node:20-alpine AS deps
+
+WORKDIR /app
+
+# Copy package files
+COPY dashboard/package*.json ./
+
+# Install dependencies
+RUN npm ci && npm cache clean --force
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Stage 2: Build
+# ═══════════════════════════════════════════════════════════════════════════════
+
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+# Copy dependencies
+COPY --from=deps /app/node_modules ./node_modules
+COPY dashboard/ .
+
+# Set build-time environment variables
+ARG NEXT_PUBLIC_API_URL
+ARG NEXT_PUBLIC_CHAIN_ID
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_CHAIN_ID=$NEXT_PUBLIC_CHAIN_ID
+
+# Build Next.js
+RUN npm run build
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Stage 3: Production
+# ═══════════════════════════════════════════════════════════════════════════════
+
+FROM node:20-alpine AS production
+
+# Security: Run as non-root user
+RUN addgroup -g 1001 -S securemint && \
+    adduser -S securemint -u 1001
+
+WORKDIR /app
+
+# Copy necessary files
+COPY --from=builder --chown=securemint:securemint /app/public ./public
+COPY --from=builder --chown=securemint:securemint /app/.next/standalone ./
+COPY --from=builder --chown=securemint:securemint /app/.next/static ./.next/static
+
+# Set environment
+ENV NODE_ENV=production
+ENV PORT=3001
+ENV HOSTNAME="0.0.0.0"
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:3001 || exit 1
+
+# Switch to non-root user
+USER securemint
+
+# Expose port
+EXPOSE 3001
+
+# Start application
+CMD ["node", "server.js"]

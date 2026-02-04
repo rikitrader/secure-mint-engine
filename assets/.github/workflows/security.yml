@@ -1,0 +1,209 @@
+name: Security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Run weekly on Sundays at 00:00 UTC
+    - cron: "0 0 * * 0"
+
+jobs:
+  # ═══════════════════════════════════════════════════════════════════════════
+  # SLITHER STATIC ANALYSIS
+  # ═══════════════════════════════════════════════════════════════════════════
+  slither:
+    name: Slither Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Slither
+        run: pip install slither-analyzer
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Slither (JSON output)
+        run: slither . --json slither-report.json
+        continue-on-error: true
+
+      - name: Run Slither (Human readable)
+        run: slither . --checklist
+        continue-on-error: true
+
+      - name: Upload Slither report
+        uses: actions/upload-artifact@v4
+        with:
+          name: slither-report
+          path: slither-report.json
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # MYTHRIL SYMBOLIC EXECUTION
+  # ═══════════════════════════════════════════════════════════════════════════
+  mythril:
+    name: Mythril Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Mythril
+        run: pip install mythril
+
+      - name: Run Mythril on SecureMintPolicy
+        run: |
+          myth analyze contracts/SecureMintPolicy.sol \
+            --solc-json mythril.config.json \
+            --execution-timeout 300 \
+            -o json > mythril-policy.json || true
+        continue-on-error: true
+
+      - name: Run Mythril on BackedToken
+        run: |
+          myth analyze contracts/BackedToken.sol \
+            --solc-json mythril.config.json \
+            --execution-timeout 300 \
+            -o json > mythril-token.json || true
+        continue-on-error: true
+
+      - name: Upload Mythril reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: mythril-reports
+          path: mythril-*.json
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # FOUNDRY FUZZ TESTING
+  # ═══════════════════════════════════════════════════════════════════════════
+  fuzz:
+    name: Extended Fuzz Testing
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
+
+      - name: Run extended fuzz tests
+        run: |
+          forge test --match-test "testFuzz" -vvv
+        env:
+          FOUNDRY_FUZZ_RUNS: 50000
+          FOUNDRY_FUZZ_MAX_TEST_REJECTS: 100000
+
+      - name: Run invariant tests
+        run: |
+          forge test --match-contract "Invariant" -vvv
+        env:
+          FOUNDRY_INVARIANT_RUNS: 1000
+          FOUNDRY_INVARIANT_DEPTH: 100
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # DEPENDENCY AUDIT
+  # ═══════════════════════════════════════════════════════════════════════════
+  dependency-audit:
+    name: Dependency Audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run npm audit
+        run: npm audit --audit-level=high
+        continue-on-error: true
+
+      - name: Check for known vulnerabilities in Solidity deps
+        run: |
+          echo "Checking OpenZeppelin version..."
+          npm list @openzeppelin/contracts || true
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # STORAGE LAYOUT CHECK
+  # ═══════════════════════════════════════════════════════════════════════════
+  storage-layout:
+    name: Storage Layout Validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Generate storage layout
+        run: |
+          forge inspect SecureMintPolicy storage-layout --pretty > storage-layout-policy.txt
+          forge inspect BackedToken storage-layout --pretty > storage-layout-token.txt
+          forge inspect TreasuryVault storage-layout --pretty > storage-layout-treasury.txt
+
+      - name: Upload storage layouts
+        uses: actions/upload-artifact@v4
+        with:
+          name: storage-layouts
+          path: storage-layout-*.txt
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # SECURITY SUMMARY
+  # ═══════════════════════════════════════════════════════════════════════════
+  summary:
+    name: Security Summary
+    runs-on: ubuntu-latest
+    needs: [slither, mythril, fuzz, dependency-audit, storage-layout]
+    if: always()
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Generate security summary
+        run: |
+          echo "# Security Analysis Summary" > security-summary.md
+          echo "" >> security-summary.md
+          echo "## Results" >> security-summary.md
+          echo "- Slither: ${{ needs.slither.result }}" >> security-summary.md
+          echo "- Mythril: ${{ needs.mythril.result }}" >> security-summary.md
+          echo "- Fuzz Tests: ${{ needs.fuzz.result }}" >> security-summary.md
+          echo "- Dependency Audit: ${{ needs.dependency-audit.result }}" >> security-summary.md
+          echo "- Storage Layout: ${{ needs.storage-layout.result }}" >> security-summary.md
+
+      - name: Upload summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-summary
+          path: security-summary.md

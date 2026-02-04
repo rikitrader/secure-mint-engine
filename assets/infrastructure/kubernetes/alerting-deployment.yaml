@@ -1,0 +1,161 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: securemint-alerting
+  namespace: securemint
+  labels:
+    app: securemint-alerting
+    component: backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: securemint-alerting
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: securemint-alerting
+        component: backend
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: securemint-alerting
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+        - name: alerting
+          image: securemint/alerting:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+              name: http
+              protocol: TCP
+          env:
+            - name: NODE_ENV
+              value: "production"
+            - name: RPC_URL
+              valueFrom:
+                secretKeyRef:
+                  name: securemint-secrets
+                  key: rpc-url
+            - name: DISCORD_WEBHOOK_URL
+              valueFrom:
+                secretKeyRef:
+                  name: securemint-alerting-secrets
+                  key: discord-webhook
+            - name: SLACK_WEBHOOK_URL
+              valueFrom:
+                secretKeyRef:
+                  name: securemint-alerting-secrets
+                  key: slack-webhook
+            - name: PAGERDUTY_ROUTING_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: securemint-alerting-secrets
+                  key: pagerduty-key
+            - name: TELEGRAM_BOT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: securemint-alerting-secrets
+                  key: telegram-token
+            - name: TELEGRAM_CHAT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: securemint-alerting-secrets
+                  key: telegram-chat-id
+            - name: TOKEN_ADDRESS
+              valueFrom:
+                configMapKeyRef:
+                  name: securemint-contracts
+                  key: token-address
+            - name: POLICY_ADDRESS
+              valueFrom:
+                configMapKeyRef:
+                  name: securemint-contracts
+                  key: policy-address
+            - name: ORACLE_ADDRESS
+              valueFrom:
+                configMapKeyRef:
+                  name: securemint-contracts
+                  key: oracle-address
+            - name: TREASURY_ADDRESS
+              valueFrom:
+                configMapKeyRef:
+                  name: securemint-contracts
+                  key: treasury-address
+            - name: EMERGENCY_ADDRESS
+              valueFrom:
+                configMapKeyRef:
+                  name: securemint-contracts
+                  key: emergency-address
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "128Mi"
+            limits:
+              cpu: "200m"
+              memory: "256Mi"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: app
+                    operator: In
+                    values:
+                      - securemint-alerting
+              topologyKey: kubernetes.io/hostname
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: securemint-alerting
+  namespace: securemint
+  labels:
+    app: securemint-alerting
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8080
+      targetPort: 8080
+      protocol: TCP
+      name: http
+  selector:
+    app: securemint-alerting
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: securemint-alerting
+  namespace: securemint

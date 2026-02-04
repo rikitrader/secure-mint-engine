@@ -1,0 +1,96 @@
+{
+  "name": "secure-mint-engine",
+  "version": "1.0.0",
+  "description": "Oracle-gated secure minting protocol for backed tokens",
+  "main": "index.js",
+  "scripts": {
+    "compile": "hardhat compile",
+    "build": "hardhat compile && forge build",
+    "test": "hardhat test",
+    "test:forge": "forge test",
+    "test:coverage": "hardhat coverage",
+    "test:gas": "REPORT_GAS=true hardhat test",
+    "test:invariant": "forge test --match-contract Invariant",
+    "test:fuzz": "forge test --match-contract Fuzz",
+    "test:all": "npm run test && npm run test:forge",
+    "lint": "solhint 'contracts/**/*.sol'",
+    "lint:fix": "solhint 'contracts/**/*.sol' --fix",
+    "format": "prettier --write 'contracts/**/*.sol' 'test/**/*.ts' 'scripts/**/*.ts'",
+    "format:check": "prettier --check 'contracts/**/*.sol' 'test/**/*.ts' 'scripts/**/*.ts'",
+    "security": "slither . --config-file slither.config.json",
+    "security:mythril": "myth analyze contracts/*.sol --solc-json mythril.config.json",
+    "size": "hardhat size-contracts",
+    "deploy:local": "hardhat run scripts/deploy/deploy.ts --network localhost",
+    "deploy:sepolia": "hardhat run scripts/deploy/deploy.ts --network sepolia",
+    "deploy:mainnet": "hardhat run scripts/deploy/deploy.ts --network mainnet",
+    "deploy:arbitrum": "hardhat run scripts/deploy/deploy.ts --network arbitrum",
+    "verify": "hardhat verify",
+    "clean": "hardhat clean && forge clean && rm -rf artifacts cache coverage typechain-types",
+    "prepare": "husky install",
+    "ci:check": "python3 scripts/ci/monetary_routing_ci_check.py",
+    "ci:elimination": "python3 scripts/ci/auto_elimination_check.py"
+  },
+  "dependencies": {
+    "@chainlink/contracts": "^0.8.0",
+    "@openzeppelin/contracts": "^5.0.0",
+    "@openzeppelin/contracts-upgradeable": "^5.0.0"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-chai-matchers": "^2.0.0",
+    "@nomicfoundation/hardhat-ethers": "^3.0.0",
+    "@nomicfoundation/hardhat-network-helpers": "^1.0.0",
+    "@nomicfoundation/hardhat-toolbox": "^4.0.0",
+    "@nomicfoundation/hardhat-verify": "^2.0.0",
+    "@typechain/ethers-v6": "^0.5.0",
+    "@typechain/hardhat": "^9.0.0",
+    "@types/chai": "^4.3.0",
+    "@types/mocha": "^10.0.0",
+    "@types/node": "^20.0.0",
+    "chai": "^4.3.0",
+    "dotenv": "^16.3.0",
+    "ethers": "^6.9.0",
+    "hardhat": "^2.19.0",
+    "hardhat-contract-sizer": "^2.10.0",
+    "hardhat-gas-reporter": "^1.0.0",
+    "husky": "^8.0.0",
+    "lint-staged": "^15.0.0",
+    "prettier": "^3.1.0",
+    "prettier-plugin-solidity": "^1.2.0",
+    "solhint": "^4.0.0",
+    "solidity-coverage": "^0.8.0",
+    "ts-node": "^10.9.0",
+    "typechain": "^8.3.0",
+    "typescript": "^5.3.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/your-org/secure-mint-engine.git"
+  },
+  "keywords": [
+    "ethereum",
+    "solidity",
+    "stablecoin",
+    "defi",
+    "oracle",
+    "proof-of-reserve",
+    "secure-mint"
+  ],
+  "author": "SecureMintEngine Team",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/your-org/secure-mint-engine/issues"
+  },
+  "homepage": "https://github.com/your-org/secure-mint-engine#readme",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "lint-staged": {
+    "*.sol": [
+      "solhint --fix",
+      "prettier --write"
+    ],
+    "*.{ts,js}": [
+      "prettier --write"
+    ]
+  }
+}

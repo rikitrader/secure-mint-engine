@@ -1,0 +1,281 @@
+{
+  "info": {
+    "_postman_id": "securemint-api-collection",
+    "name": "SecureMint Engine API",
+    "description": "Complete API collection for SecureMint Engine",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{jwt_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "jwt_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "test_address",
+      "value": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/health",
+              "host": ["{{base_url}}"],
+              "path": ["health"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Token",
+      "item": [
+        {
+          "name": "Get Token Info",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/token",
+              "host": ["{{base_url}}"],
+              "path": ["api", "token"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Balance",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/token/balance/{{test_address}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "token", "balance", "{{test_address}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Check Invariants",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/invariants",
+              "host": ["{{base_url}}"],
+              "path": ["api", "invariants"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Mint",
+      "item": [
+        {
+          "name": "Get Epoch Capacity",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/mint/capacity",
+              "host": ["{{base_url}}"],
+              "path": ["api", "mint", "capacity"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Simulate Mint",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"recipient\": \"{{test_address}}\",\n  \"amount\": \"1000000000\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/mint/simulate",
+              "host": ["{{base_url}}"],
+              "path": ["api", "mint", "simulate"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Batch Mint Simulation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"requests\": [\n    {\"recipient\": \"0x1234567890123456789012345678901234567890\", \"amount\": \"1000000\"},\n    {\"recipient\": \"0x2345678901234567890123456789012345678901\", \"amount\": \"2000000\"}\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/mint/batch",
+              "host": ["{{base_url}}"],
+              "path": ["api", "mint", "batch"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Mint History",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/mint/history?page=1&limit=20",
+              "host": ["{{base_url}}"],
+              "path": ["api", "mint", "history"],
+              "query": [
+                {"key": "page", "value": "1"},
+                {"key": "limit", "value": "20"}
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Burn",
+      "item": [
+        {
+          "name": "Simulate Burn",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": \"1000000000\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/burn/simulate",
+              "host": ["{{base_url}}"],
+              "path": ["api", "burn", "simulate"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Oracle",
+      "item": [
+        {
+          "name": "Get Oracle Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/oracle/status",
+              "host": ["{{base_url}}"],
+              "path": ["api", "oracle", "status"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Backing Data",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/oracle/backing",
+              "host": ["{{base_url}}"],
+              "path": ["api", "oracle", "backing"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Treasury",
+      "item": [
+        {
+          "name": "Get Treasury Balances",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/treasury/balances",
+              "host": ["{{base_url}}"],
+              "path": ["api", "treasury", "balances"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Compliance",
+      "item": [
+        {
+          "name": "Check Compliance",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"addresses\": [\"{{test_address}}\"],\n  \"checkKYC\": true,\n  \"checkAML\": true,\n  \"checkSanctions\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/compliance/check",
+              "host": ["{{base_url}}"],
+              "path": ["api", "compliance", "check"]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
