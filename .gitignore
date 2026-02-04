@@ -1,0 +1,83 @@
+# Dependencies
+node_modules/
+.pnp/
+.pnp.js
+
+# Build outputs
+dist/
+build/
+out/
+artifacts/
+cache/
+typechain/
+typechain-types/
+
+# Testing
+coverage/
+coverage.json
+.nyc_output/
+
+# Environment
+.env
+.env.local
+.env.*.local
+*.env
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+*.log
+
+# Foundry
+out/
+forge-cache/
+
+# Hardhat
+cache/
+artifacts/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Secrets - NEVER COMMIT THESE
+*.pem
+*.key
+secrets/
+.secrets/
+credentials/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Package locks (choose one)
+# package-lock.json
+# yarn.lock
+
+# Generated files
+*.generated.*
+abis/
+
+# Local development
+.local/
+*.local
+
+# Deployment artifacts (may contain sensitive data)
+deployments/localhost/
+broadcast/
+
+# Graph
+generated/
+subgraph.yaml.bak
