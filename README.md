@@ -35,6 +35,14 @@
 
 ---
 
+<div align="center">
+<img src="assets/matrix-token.svg" alt="SecureMint Token" width="300">
+
+*[View interactive version](assets/matrix-token.html)*
+</div>
+
+---
+
 ## Overview
 
 **SecureMint Engine** is an enterprise-grade oracle-gated secure minting protocol designed for creating backed tokens including stablecoins, asset-backed tokens, and Real World Asset (RWA) tokens. At its core, the protocol enforces one fundamental, non-negotiable invariant: tokens can ONLY be minted when backing is provably sufficient via on-chain oracles or Proof-of-Reserve feeds. This cryptographic enforcement eliminates the trust assumptions that have led to catastrophic failures in the stablecoin and backed token ecosystem.
