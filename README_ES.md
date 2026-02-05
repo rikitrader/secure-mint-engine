@@ -38,14 +38,6 @@
 
 ---
 
-<div align="center">
-<img src="assets/matrix-token.svg" alt="Token SecureMint" width="300">
-
-*[Ver versión interactiva](assets/matrix-token.html)*
-</div>
-
----
-
 ## Descripción General
 
 **SecureMint Engine** es un protocolo empresarial de acuñación segura con control de oráculos, diseñado para crear tokens respaldados incluyendo monedas estables, tokens respaldados por activos y tokens de Activos del Mundo Real (RWA, por sus siglas en inglés). En su núcleo, el protocolo impone un invariante fundamental e innegociable: los tokens SOLO pueden acuñarse cuando el respaldo es demostrablemente suficiente a través de oráculos en cadena o feeds de Prueba de Reservas. Esta aplicación criptográfica elimina los supuestos de confianza que han llevado a fallos catastróficos en el ecosistema de monedas estables y tokens respaldados.
