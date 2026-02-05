@@ -11,6 +11,8 @@
 [![Node.js](https://img.shields.io/badge/Node.js-18%2B-green.svg)](https://nodejs.org/)
 [![Solidity](https://img.shields.io/badge/Solidity-0.8.20-blue.svg)](https://soliditylang.org/)
 
+**English** | [Versión en Español](README_ES.md)
+
 </div>
 
 ---
@@ -18,6 +20,7 @@
 ## Table of Contents
 
 - [Overview](#overview)
+- [Mathematical Foundations & Economic Model](#mathematical-foundations--economic-model)
 - [Architecture](#architecture)
 - [Core Invariants](#core-invariants)
 - [Security Audit](#security-audit)
@@ -176,6 +179,394 @@ If your token claims backing—whether from fiat reserves, crypto collateral, re
 The era of trust-based backing is ending. Users, regulators, and institutions increasingly demand verifiable proof rather than attestations and promises. SecureMint Engine represents the architectural standard for this new era: backing that is proven, not promised; enforcement that is cryptographic, not discretionary; and security that is guaranteed by mathematics, not trust.
 
 Welcome to the future of backed tokens. Welcome to SecureMint Engine.
+
+---
+
+## Mathematical Foundations & Economic Model
+
+SecureMint Engine is built on rigorous mathematical foundations that ensure cryptographic security and economic stability. This section documents the core equations, models, and graphs that underpin the protocol.
+
+### Core Invariant Equations
+
+#### Fundamental Backing Invariant (INV-SM-1)
+
+The primary security constraint ensuring tokens are always fully backed:
+
+```
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                                                                              ║
+║   ∀t : B(t) ≥ S(t)                                                          ║
+║                                                                              ║
+║   where:                                                                     ║
+║     B(t) = Total verified backing value at time t (in base currency)        ║
+║     S(t) = Total token supply at time t                                     ║
+║                                                                              ║
+║   Expanded form:                                                             ║
+║                                                                              ║
+║   B(t) = Σᵢ[Rᵢ(t) × Pᵢ(t)] + PoR(t)                                        ║
+║                                                                              ║
+║   where:                                                                     ║
+║     Rᵢ(t)  = Reserve quantity of asset i at time t                          ║
+║     Pᵢ(t)  = Oracle price of asset i at time t                              ║
+║     PoR(t) = Proof-of-Reserve attestation for off-chain assets              ║
+║                                                                              ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+```
+
+#### Collateralization Ratio
+
+```
+                    B(t)
+    CR(t) = ─────────────────  × 100%
+                    S(t)
+
+    Constraints:
+    ┌─────────────────────────────────────────────────────────┐
+    │  CR(t) ≥ 100%     →  Minting ALLOWED                    │
+    │  CR(t) < 100%     →  Minting BLOCKED, System PAUSED     │
+    │  CR(t) ≥ 150%     →  Healthy over-collateralization     │
+    └─────────────────────────────────────────────────────────┘
+```
+
+#### Mint Authorization Function
+
+```
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                                                                              ║
+║   canMint(amount, recipient) → boolean                                       ║
+║                                                                              ║
+║   = oracle_healthy(t)                                                        ║
+║     ∧ (S(t) + amount ≤ B(t))                                                ║
+║     ∧ (minted_epoch(e) + amount ≤ epoch_cap)                                ║
+║     ∧ (S(t) + amount ≤ global_cap)                                          ║
+║     ∧ ¬isPaused                                                              ║
+║     ∧ hasRole(msg.sender, MINTER_ROLE)                                      ║
+║                                                                              ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+```
+
+### Oracle Health Functions
+
+#### Staleness Check (INV-SM-2)
+
+```
+    oracle_healthy(t) = (t - t_last_update) < STALENESS_THRESHOLD
+
+    where:
+      t                   = Current timestamp
+      t_last_update       = Last oracle update timestamp
+      STALENESS_THRESHOLD = 3600 seconds (1 hour)
+
+    ┌──────────────────────────────────────────────────────────────────────┐
+    │  ORACLE STALENESS TIMELINE                                           │
+    │                                                                      │
+    │  Fresh         Warning Zone        Stale (BLOCKED)                   │
+    │    ◄─────────────►◄───────────────►◄───────────────────►             │
+    │    0            45min            1hr                                 │
+    │    │              │               │                                  │
+    │    ●──────────────●───────────────●────────────────────►  time       │
+    │  update        warning         reject                                │
+    │                                                                      │
+    └──────────────────────────────────────────────────────────────────────┘
+```
+
+#### Price Deviation Detection
+
+```
+    deviation(P_new, P_old) = |P_new - P_old| / P_old × 100%
+
+    ┌───────────────────────────────────────────────────────────────┐
+    │  Deviation < 5%   →  ACCEPT                                   │
+    │  5% ≤ Deviation < 10%  →  ACCEPT with WARNING flag            │
+    │  Deviation ≥ 10%  →  REJECT (requires multi-oracle consensus) │
+    └───────────────────────────────────────────────────────────────┘
+```
+
+#### Multi-Oracle Aggregation
+
+```
+    P_aggregated = median(P₁, P₂, ..., Pₙ)
+
+    Consensus requirement:
+
+    ∀i,j : |Pᵢ - Pⱼ| / max(Pᵢ, Pⱼ) < MAX_DEVIATION (5%)
+
+    If consensus fails → System enters DEGRADED mode → Minting PAUSED
+```
+
+### Rate Limiting Equations (INV-SM-3)
+
+#### Epoch-Based Rate Limiting
+
+```
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                                                                              ║
+║   epoch(t) = ⌊t / EPOCH_DURATION⌋                                           ║
+║                                                                              ║
+║   minted_epoch(e) = Σ amount_minted during epoch e                          ║
+║                                                                              ║
+║   Rate limit check:                                                          ║
+║   minted_epoch(current_epoch) + amount ≤ EPOCH_CAP                          ║
+║                                                                              ║
+║   Default parameters:                                                        ║
+║     EPOCH_DURATION = 86400 seconds (24 hours)                               ║
+║     EPOCH_CAP = 5% of total supply                                          ║
+║                                                                              ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+```
+
+#### Exponential Backoff for Failed Mints
+
+```
+    wait_time(n) = min(BASE_DELAY × 2ⁿ, MAX_DELAY)
+
+    where:
+      n         = Number of consecutive failed attempts
+      BASE_DELAY = 1 second
+      MAX_DELAY  = 3600 seconds (1 hour)
+
+    ┌──────────────────────────────────────────────────────────────────────┐
+    │  BACKOFF CURVE                                                       │
+    │                                                                      │
+    │  wait(s) │                                    ┌───────────────       │
+    │    3600  │                                    │                      │
+    │          │                              ┌─────┘                      │
+    │    1800  │                        ┌─────┘                            │
+    │          │                  ┌─────┘                                  │
+    │     900  │            ┌─────┘                                        │
+    │          │      ┌─────┘                                              │
+    │     450  │ ┌────┘                                                    │
+    │          │─┘                                                         │
+    │       1  └──────────────────────────────────────────────► attempts   │
+    │          1    2    3    4    5    6    7    8    9   10              │
+    │                                                                      │
+    └──────────────────────────────────────────────────────────────────────┘
+```
+
+### Treasury Reserve Model
+
+#### Four-Tier Reserve Allocation
+
+```
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                        RESERVE TIER STRUCTURE                                ║
+╠══════════════════════════════════════════════════════════════════════════════╣
+║                                                                              ║
+║   Total Reserves = Tier₀ + Tier₁ + Tier₂ + Tier₃                            ║
+║                                                                              ║
+║   ┌────────┬───────────┬─────────────┬───────────────────────────────────┐  ║
+║   │  Tier  │ Allocation│ Access Time │ Asset Types                       │  ║
+║   ├────────┼───────────┼─────────────┼───────────────────────────────────┤  ║
+║   │  T₀    │   5-10%   │ Immediate   │ Stablecoins, Native tokens        │  ║
+║   │  T₁    │  15-25%   │ < 4 hours   │ Money markets (Aave, Compound)    │  ║
+║   │  T₂    │  50-60%   │ < 48 hours  │ Cold storage, Multi-sig vaults    │  ║
+║   │  T₃    │  10-20%   │ < 7 days    │ T-Bills, RWA, Bonds               │  ║
+║   └────────┴───────────┴─────────────┴───────────────────────────────────┘  ║
+║                                                                              ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+```
+
+#### Reserve Utilization Function
+
+```
+    liquidity_available(urgency) =
+        if urgency == IMMEDIATE:
+            return T₀
+        elif urgency == URGENT:
+            return T₀ + T₁
+        elif urgency == STANDARD:
+            return T₀ + T₁ + T₂
+        else:
+            return T₀ + T₁ + T₂ + T₃
+
+    ┌──────────────────────────────────────────────────────────────────────┐
+    │  RESERVE ACCESSIBILITY GRAPH                                         │
+    │                                                                      │
+    │  Available │                                                         │
+    │  Reserves  │                                      ┌─────────  100%   │
+    │    (%)     │                            ┌─────────┘                  │
+    │            │                   ┌────────┘                            │
+    │    80%     │                   │                                     │
+    │            │          ┌────────┘                                     │
+    │    60%     │          │                                              │
+    │            │ ┌────────┘                                              │
+    │    40%     │ │                                                       │
+    │            │ │                                                       │
+    │    20%     │ │                                                       │
+    │            ├─┘                                                       │
+    │     0%     └─────────────────────────────────────────────► time      │
+    │            0    4hr    12hr    24hr    48hr    5d     7d             │
+    │           T₀    T₁                     T₂            T₃              │
+    │                                                                      │
+    └──────────────────────────────────────────────────────────────────────┘
+```
+
+### Redemption Queue Model
+
+#### FIFO Redemption Processing
+
+```
+    Queue = [(amount₁, user₁, timestamp₁), (amount₂, user₂, timestamp₂), ...]
+
+    process_redemption(queue_position):
+        if available_liquidity >= queue[position].amount:
+            execute_redemption(queue[position])
+            return SUCCESS
+        else:
+            return QUEUED
+
+    Priority function:
+    priority(request) = base_priority + time_bonus(age) + size_penalty(amount)
+
+    where:
+      time_bonus(age) = min(age / 86400, 10)  // +1 per day, max +10
+      size_penalty(amount) = -log₂(amount / median_request)
+```
+
+#### Redemption Rate Limiting
+
+```
+    max_redemption_per_epoch = min(
+        EPOCH_CAP,
+        available_liquidity × 0.9,  // 90% of liquid reserves
+        total_supply × 0.15          // 15% of supply per epoch
+    )
+```
+
+### Economic Stability Model
+
+#### Bank Run Resistance
+
+```
+╔══════════════════════════════════════════════════════════════════════════════╗
+║  BANK RUN SIMULATION MODEL                                                   ║
+╠══════════════════════════════════════════════════════════════════════════════╣
+║                                                                              ║
+║   redemption_rate(t) = base_rate × (1 + panic_factor(t))                    ║
+║                                                                              ║
+║   panic_factor(t) = α × (1 - CR(t)/100) + β × social_sentiment(t)           ║
+║                                                                              ║
+║   System survives if:                                                        ║
+║   ∫₀ᵀ redemption_rate(t) dt ≤ Total_Reserves                                ║
+║                                                                              ║
+║   where T = stress test duration                                             ║
+║                                                                              ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+    ┌──────────────────────────────────────────────────────────────────────┐
+    │  BANK RUN STRESS TEST VISUALIZATION                                  │
+    │                                                                      │
+    │  Reserves │ ████████████████████████████████████████████ 100%       │
+    │    (%)    │ ████████████████████████████████████████                │
+    │           │ ████████████████████████████████████                    │
+    │    75%    │ ████████████████████████████████          ← T₂ depleted │
+    │           │ ████████████████████████████                            │
+    │    50%    │ ████████████████████████                                │
+    │           │ ████████████████████              ← T₁ depleted         │
+    │    25%    │ ████████████████                                        │
+    │           │ ████████████████                                        │
+    │    10%    │ ██████████████                    ← EMERGENCY THRESHOLD │
+    │           │ ████████──────────────────────────────────────────────  │
+    │     0%    └─────────────────────────────────────────────► time      │
+    │           0     12hr    24hr    48hr    72hr    96hr    120hr       │
+    │                                                                      │
+    │  Legend: ████ = Reserves remaining                                   │
+    │          ──── = Protocol survives (reserves > 0)                     │
+    │                                                                      │
+    └──────────────────────────────────────────────────────────────────────┘
+```
+
+### Governance Timelock Mathematics
+
+#### Delay Calculation
+
+```
+    execution_time = proposal_time + voting_period + timelock_delay
+
+    ┌───────────────────────────────────────────────────────────────┐
+    │  Parameter Changes:                                           │
+    │    timelock_delay = 48 hours (standard)                       │
+    │    timelock_delay = 72 hours (critical parameters)            │
+    │                                                               │
+    │  Emergency Actions:                                           │
+    │    timelock_delay = 0 (Guardian multisig, pause only)         │
+    └───────────────────────────────────────────────────────────────┘
+```
+
+#### Voting Power Calculation
+
+```
+    voting_power(address, block) = token_balance(address, block)
+                                  + delegated_votes(address, block)
+
+    Quorum requirement:
+    total_votes_cast ≥ QUORUM_PERCENTAGE × total_supply
+
+    Pass requirement:
+    votes_for > votes_against
+    AND total_votes_cast ≥ quorum
+```
+
+### Backtest Scoring Function
+
+```
+╔══════════════════════════════════════════════════════════════════════════════╗
+║  ECONOMIC SECURITY SCORE CALCULATION                                         ║
+╠══════════════════════════════════════════════════════════════════════════════╣
+║                                                                              ║
+║   score = 100                                                                ║
+║         - 20 × invariant_violations                                          ║
+║         - 10 × backing_ratio_breaches                                        ║
+║         -  5 × oracle_failure_hours                                          ║
+║         - 15 × redemption_halts                                              ║
+║         -  2 × warning_events                                                ║
+║                                                                              ║
+║   Pass criteria: score ≥ 80 AND invariant_violations == 0                   ║
+║                                                                              ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+    ┌──────────────────────────────────────────────────────────────────────┐
+    │  SCENARIO PERFORMANCE CHART                                          │
+    │                                                                      │
+    │  Score │                                                             │
+    │   100  │ ●────────────────────────── BASELINE (98)                  │
+    │        │                                                             │
+    │    90  │     ●───────────────────── ORACLE_STRESS (92)              │
+    │        │                                                             │
+    │    80  │ ════════════════════════════════════════ PASS THRESHOLD    │
+    │        │          ●─────────────── MARKET_CRASH (85)                │
+    │    70  │               ●────────── BANK_RUN (78)                    │
+    │        │                                                             │
+    │    60  │                                                             │
+    │        │                    ●──── COMBINED_STRESS (65)              │
+    │    50  │                                                             │
+    │        │                                                             │
+    │    40  │                                                             │
+    │        │                                                             │
+    │     0  └─────────────────────────────────────────────────────────── │
+    │                                                                      │
+    └──────────────────────────────────────────────────────────────────────┘
+```
+
+### Gas Optimization Model
+
+```
+    mint_gas_cost = BASE_GAS
+                  + oracle_query_gas
+                  + state_update_gas
+                  + event_emission_gas
+
+    Estimated costs:
+    ┌─────────────────────────────────────────────────┐
+    │  Operation              │  Gas Units            │
+    ├─────────────────────────┼───────────────────────┤
+    │  Base mint              │  ~65,000              │
+    │  Oracle query           │  ~15,000              │
+    │  State update           │  ~25,000              │
+    │  Event emission         │  ~3,000               │
+    │  Total                  │  ~108,000             │
+    └─────────────────────────┴───────────────────────┘
+```
 
 ---
 
