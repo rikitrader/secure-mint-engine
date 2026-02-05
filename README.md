@@ -2,6 +2,8 @@
 
 <div align="center">
 
+<img src="assets/logo.svg" alt="SecureMint Engine Logo" width="200" height="200">
+
 ```
   ____                           __  __ _       _
  / ___|  ___  ___ _   _ _ __ ___|  \/  (_)_ __ | |_
