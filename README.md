@@ -4,15 +4,7 @@
 
 <img src="assets/logo.svg" alt="SecureMint Engine Logo" width="200" height="200">
 
-```
-  ____                           __  __ _       _
- / ___|  ___  ___ _   _ _ __ ___|  \/  (_)_ __ | |_
- \___ \ / _ \/ __| | | | '__/ _ \ |\/| | | '_ \| __|
-  ___) |  __/ (__| |_| | | |  __/ |  | | | | | | |_
- |____/ \___|\___|\__,_|_|  \___|_|  |_|_|_| |_|\__|
-
-     Oracle-Gated Secure Minting Protocol v1.0
-```
+**Oracle-Gated Secure Minting Protocol v1.0**
 
 **Enterprise-grade oracle-gated secure minting protocol for backed tokens**
 
