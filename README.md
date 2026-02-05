@@ -2,9 +2,7 @@
 
 <div align="center">
 
-<img src="assets/logo.svg" alt="SecureMint Engine Logo" width="200" height="200">
-
-**Oracle-Gated Secure Minting Protocol v1.0**
+<img src="assets/logo.svg" alt="SecureMint Engine Logo" width="640">
 
 **Enterprise-grade oracle-gated secure minting protocol for backed tokens**
 
